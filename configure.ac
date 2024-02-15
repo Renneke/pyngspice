@@ -41,6 +41,10 @@ AC_CONFIG_MACRO_DIR([m4])
 # Package Options
 # ---------------
 
+# --enable-python: Add xspice python support
+AC_ARG_ENABLE([python],
+    [AS_HELP_STRING([--enable-python], [Enable xspice python support])])
+
 # --enable-ansi: try to force --ansi option to the compiler
 AC_ARG_ENABLE([ansi],
     [AS_HELP_STRING([--enable-ansi], [Force --ansi option for compilation])])
@@ -350,9 +354,9 @@ elif test "x$with_tcl" != x  &&  test "x$with_tcl" != xno ; then
         *)
             ;;
     esac
- 
+
     with_x=no
- 
+
     AC_MSG_CHECKING([for tclConfig.sh])
     tcl_config_sh=""
     if test "x$with_tcl" != xyes ; then
@@ -386,8 +390,8 @@ elif test "x$with_tcl" != x  &&  test "x$with_tcl" != xno ; then
                 break
             fi
         done
- 
- 
+
+
        if test "x$tcl_config_sh" = x ; then
            for dir in \
                `ls -dr /usr/local/tcltk/tcl[[7-9]].[[0-9]]* 2>/dev/null` \
@@ -415,22 +419,22 @@ elif test "x$with_tcl" != x  &&  test "x$with_tcl" != xno ; then
           done
        fi
     fi
- 
+
     AC_MSG_RESULT([${tcl_config_sh}])
- 
+
     if test "x$tcl_config_sh" = x ; then
         echo "can't find Tcl configuration script \"tclConfig.sh\""
         find /usr/ -name 'tclConfig.sh' -exec echo "Should you add --with-tcl={} to ./configure arguments?" \; | sed -re "s/\/tclConfig.sh/ /"
         exit 1
     fi
- 
+
  .  $tcl_config_sh
- 
+
     CFLAGS="$CFLAGS $TCL_INCLUDE_SPEC"
     CPPFLAGS="$CPPFLAGS $TCL_INCLUDE_SPEC"
- 
+
     AC_CHECK_HEADERS([tcl.h blt.h], [], [AC_MSG_ERROR([Couldn't find Tcl/BLT headers])])
- 
+
     if test ! -x "$TCL_EXEC_PREFIX/bin/tclsh$TCL_VERSION" ; then
         AC_MSG_ERROR([Couldn't find $TCL_EXEC_PREFIX/bin/tclsh$TCL_VERSION])
     fi
@@ -450,14 +454,14 @@ EOF
         AC_MSG_ERROR([Couldn't find BLT])
     fi
     rm -f conftest.tcl
-    
+
     AC_CHECK_LIB([pthread], [pthread_create])
-    
+
     if test -n "$libdir" ; then
         AC_SUBST([libdir])
         echo "libraries in $libdir"
     fi
-    
+
     if test -z "$libdir" ; then
         for TCL_PACKAGE_PATH_ELEMENT in $TCL_PACKAGE_PATH ; do
             if test -a "$TCL_PACKAGE_PATH_ELEMENT" ; then
@@ -887,6 +891,12 @@ AC_CHECK_PROGS([YACC], ['bison -y' byacc yacc])
 
 #################  XSPICE ##################################################
 # Add new code models to the build by pointing to them here.
+
+if test "x$enable_python" = xyes; then
+
+    CFLAGS="$CFLAGS $(python3-config --embed --includes) $(python3-config --ldflags --embed) $(python3 -m pybind11 --includes)"
+    AC_MSG_RESULT([Python support for xspice is enabled])
+fi
 
 if test "x$enable_xspice" = xyes; then
     if test -z "${YACC}" ; then

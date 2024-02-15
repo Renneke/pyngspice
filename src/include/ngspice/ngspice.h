@@ -8,9 +8,10 @@
 /* #include "memwatch.h"
  #define MEMWATCH */
 
+#include <Python.h>
 
-/* 
- * This file will eventually replace spice.h and lots of other 
+/*
+ * This file will eventually replace spice.h and lots of other
  * files in src/include
  */
 #ifndef _GNU_SOURCE

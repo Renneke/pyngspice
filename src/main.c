@@ -493,6 +493,8 @@ SIMinit(IFfrontEnd *frontEnd, IFsimulator **simulator)
 static void
 sp_shutdown(int exitval)
 {
+    Py_Finalize();
+
     destroy_ivars();
 #ifdef HAS_WINGUI
     if (exitval == EXIT_BAD)
@@ -794,6 +796,7 @@ print_news(void)
 #define main xmain
 #endif
 
+
 int
 main(int argc, char **argv)
 {
@@ -807,6 +810,20 @@ main(int argc, char **argv)
     FILE * volatile circuit_file;
     bool oflag = FALSE;
     bool srflag = FALSE;
+
+    Py_SetProgramName(L"ngspice");
+    Py_Initialize();
+    // Get the current Python path
+    PyObject* sysPath = PySys_GetObject("path");
+
+    // Prepend your desired directory to the Python path
+    const char* yourDirectory = ".";
+    PyObject* pathStr = PyUnicode_DecodeFSDefault(yourDirectory);
+    PyList_Insert(sysPath, 0, pathStr);
+
+    // Execute a simple Python statement
+    PyRun_SimpleString("print('Hello from Python!')");
+
 
 #ifdef TRACE
     /* this is used to detect memory leaks during debugging */
