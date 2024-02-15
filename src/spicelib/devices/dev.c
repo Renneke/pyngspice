@@ -15,7 +15,7 @@
  * uninterrupted or error-free. The end-user understands that the
  * program was developed for research purposes and is advised not to
  * rely exclusively on the program for any reason.
- * 
+ *
  * IN NO EVENT SHALL THE AUTHORS BE LIABLE TO ANY PARTY FOR DIRECT,
  * INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING
  * LOST PROFITS, ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS
@@ -182,7 +182,7 @@ spice_init_devices(void)
     g_evt_udn_info = TMALLOC(Evt_Udn_Info_t  *, 1);
     g_evt_num_udn_types = 1;
     g_evt_udn_info[0] =  &idn_digital_info;
-    
+
     DEVicesfl = TMALLOC(int, DEVNUM);
     /* tmalloc should automatically zero the array! */
 #endif
@@ -214,8 +214,8 @@ spice_init_devices(void)
     DEVices[22] = get_dio_info();
     DEVices[23] = get_hfeta_info();
     DEVices[24] = get_hfet2_info();
-    DEVices[25] = get_hsm2_info();  
-    DEVices[26] = get_hsmhv_info();  
+    DEVices[25] = get_hsm2_info();
+    DEVices[26] = get_hsmhv_info();
     DEVices[27] = get_ind_info();
     DEVices[28] = get_mut_info();
     DEVices[29] = get_isrc_info();
@@ -243,15 +243,15 @@ spice_init_devices(void)
     DEVices[50] = get_nbjt2_info();
     DEVices[51] = get_numd_info();
     DEVices[52] = get_numd2_info();
-    DEVices[53] = get_numos_info();   
+    DEVices[53] = get_numos_info();
 #else
     DEVices[49] = NULL;
     DEVices[50] = NULL;
     DEVices[51] = NULL;
     DEVices[52] = NULL;
-    DEVices[53] = NULL;  
+    DEVices[53] = NULL;
 #endif
-          
+
 #ifdef ADMS
     DEVices[54] = (SPICEdev*)get_hicum0_info();
     DEVices[55] = (SPICEdev*)get_hicum2_info();
@@ -265,7 +265,7 @@ spice_init_devices(void)
     DEVices[57] = NULL;
     DEVices[58] = NULL;
 #endif
-   
+
 #ifdef NDEV    /* NDEV */
    DEVices[59] = get_ndev_info();
 #else
@@ -319,7 +319,7 @@ int load_dev(char *name) {
   strcat(libname,name);
   strcat(libname,".so");
 
-  lib = dlopen(libname,RTLD_NOW);
+  lib = dlopen(libname,RTLD_NOW | RTLD_GLOBAL);
   if(!lib){
     msg = dlerror();
     printf("%s\n", msg);
@@ -418,13 +418,13 @@ int load_opus(char *name){
   Evt_Udn_Info_t  **udns;
   funptr_t fetch;
 
-  lib = dlopen(name,RTLD_NOW);
+  lib = dlopen(name,RTLD_NOW | RTLD_GLOBAL);
   if(!lib){
     msg = dlerror();
     printf("%s\n", msg);
     return 1;
   }
-  
+
   fetch = dlsym(lib,"CMdevNum");
   if(fetch){
     num = ((int * (*)(void)) fetch) ();

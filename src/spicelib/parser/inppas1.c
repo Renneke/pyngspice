@@ -10,7 +10,7 @@ Author: 1985 Thomas L. Quarles
 /*
  * The first pass of the circuit parser just looks for '.model' lines
  */
-
+#define TRACE
 void INPpas1(CKTcircuit *ckt, card * deck, INPtables * tab)
 {
     card *current;
@@ -27,10 +27,10 @@ void INPpas1(CKTcircuit *ckt, card * deck, INPtables * tab)
 	    if (strncmp(thisline, ".model", 6) == 0) {
 	      /* First check to see if model is multi-line.  If so,
 		 read in all lines & stick them into tab. */
-	      
+
 #ifdef TRACE
 	      /* SDB debug statement */
-      	      printf("In INPpas1, handling line = %s \n", thisline); 
+      	      printf("In INPpas1, handling line = %s \n", thisline);
 #endif
 
 	      /* Now invoke INPdomodel to stick model into model table. */
@@ -39,8 +39,8 @@ void INPpas1(CKTcircuit *ckt, card * deck, INPtables * tab)
 	    }
 	}
 
-	/* for now, we do nothing with the other cards - just 
-	 * keep them in the list for pass 2 
+	/* for now, we do nothing with the other cards - just
+	 * keep them in the list for pass 2
 	 */
     }
 }

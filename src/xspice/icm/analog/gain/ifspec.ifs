@@ -4,14 +4,14 @@ Copyright 1991
 Georgia Tech Research Corporation, Atlanta, Ga. 30332
 All Rights Reserved
 
-AUTHORS                      
+AUTHORS
 
      2 Oct 1991     Jeffrey P. Murray
 
 
 SUMMARY
 
-    This file contains the interface specification file for the 
+    This file contains the interface specification file for the
     analog gain code model.
 
 ===============================================================================*/
@@ -31,23 +31,28 @@ Port_Name:             in                 out
 Description:           "input"            "output"
 Direction:             in                 out
 Default_Type:          v                  v
-Allowed_Types:         [v,vd,i,id,vnam]   [v,vd,i,id]
-Vector:                 no                 no
-Vector_Bounds:          -                  -
+Allowed_Types:         [v,vd,i,id]        [v,vd,i,id]
+Vector:                yes                yes
+Vector_Bounds:         [1 -]              [1 -]
 Null_Allowed:          no                 no
-
 
 
 PARAMETER_TABLE:
 
+Parameter_Name:     python_module          python_function
+Description:        "The python module"    "The python function"
+Data_Type:          string                 string
+Default_Value:      "test"                 "Main"
+Limits:             -                      -
+Vector:             no                     no
+Vector_Bounds:      -                      -
+Null_Allowed:       yes                    yes
 
-Parameter_Name:     in_offset           gain        out_offset
-Description:        "input offset"      "gain"      "output offset"
-Data_Type:          real                real        real
-Default_Value:      0.0                 1.0         0.0
-Limits:             -                   -           -
-Vector:              no                  no          no
-Vector_Bounds:       -                   -           -
-Null_Allowed:       yes                 yes         yes
 
+STATIC_VAR_TABLE:
+
+Static_Var_Name:    pymodule
+Data_Type:          pointer
+Vector:              no
+Description:        "Python module"
 
