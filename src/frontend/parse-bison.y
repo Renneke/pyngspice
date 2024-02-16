@@ -1,16 +1,20 @@
 %{
     /*
-     * (compile (concat "bison " (file-relative-name buffer-file-name)))
+     * (compile (concat "bison -ydo parse-bison.c " (file-relative-name buffer-file-name)))
      */
+
+  #include "ngspice/ngspice.h"
+  #include "ngspice/fteparse.h"
 
   #include <stdio.h>
   #include <stdlib.h>
 
-  struct PPltype {
-    const char *start, *stop;
-  };
-
   # define YYLTYPE struct PPltype
+
+  #include "parse.h"
+  #include "parse-bison.h"
+  #include "parse-bison-y.h"
+
 
   # define YYLLOC_DEFAULT(Current, Rhs, N)                               \
      do                                                                  \
@@ -22,22 +26,12 @@
        }                                                                 \
      while (0)
 
-  #include "parse-bison.h"
-
-  extern int PPlex (YYSTYPE *lvalp, struct PPltype *llocp, char **line);
-  extern int PPdebug;
-
   static void PPerror (YYLTYPE *locp, char **line, struct pnode **retval, char const *);
 
-  #if defined (_MSC_VER)
-  # define __func__ __FUNCTION__ /* __func__ is C99, but MSC can't */
-  #endif
-
-
+  static char *keepline;
 %}
 
-%name-prefix="PP"
-%output="parse-bison.c"
+%name-prefix "PP"
 
 %defines
 %locations
@@ -82,7 +76,7 @@
 
 %token <num>  TOK_NUM
 %token <str>  TOK_STR
-%token        TOK_LE TOK_GE TOK_NE TOK_LRANGE TOK_RRANGE
+%token        TOK_LE TOK_GE TOK_NE
 
 %type  <pnode>   exp exp_list one_exp
 
@@ -99,12 +93,12 @@
 %left   NEG      /* negation--unary minus */
 %right  '^'      /* exponentiation */
 %left   '[' ']'
-%left   TOK_LRANGE TOK_RRANGE
 
 %initial-action      /* initialize yylval */
 {
     $$.num = 0.0;
     yylloc.start = yylloc.stop = NULL;
+    keepline = *line;
 };
 
 %%
@@ -131,42 +125,42 @@ one_exp:
 ;
 
 exp:
-    TOK_NUM                           { $$ = mknnode($1); }
-  | TOK_STR                           { $$ = mksnode($1); txfree((void*)$1); }
+    TOK_NUM                           { $$ = PP_mknnode($1); }
+  | TOK_STR                           { $$ = PP_mksnode($1); txfree($1); }
 
-  | exp ',' exp                       { $$ = mkbnode(PT_OP_COMMA,  $1, $3); }
-  | exp '+' exp                       { $$ = mkbnode(PT_OP_PLUS,   $1, $3); }
-  | exp '-' exp                       { $$ = mkbnode(PT_OP_MINUS,  $1, $3); }
-  | exp '*' exp                       { $$ = mkbnode(PT_OP_TIMES,  $1, $3); }
-  | exp '%' exp                       { $$ = mkbnode(PT_OP_MOD,    $1, $3); }
-  | exp '/' exp                       { $$ = mkbnode(PT_OP_DIVIDE, $1, $3); }
-  | exp '^' exp                       { $$ = mkbnode(PT_OP_POWER,  $1, $3); }
+  | exp ',' exp                       { $$ = PP_mkbnode(PT_OP_COMMA,  $1, $3); }
+  | exp '+' exp                       { $$ = PP_mkbnode(PT_OP_PLUS,   $1, $3); }
+  | exp '-' exp                       { $$ = PP_mkbnode(PT_OP_MINUS,  $1, $3); }
+  | exp '*' exp                       { $$ = PP_mkbnode(PT_OP_TIMES,  $1, $3); }
+  | exp '%' exp                       { $$ = PP_mkbnode(PT_OP_MOD,    $1, $3); }
+  | exp '/' exp                       { $$ = PP_mkbnode(PT_OP_DIVIDE, $1, $3); }
+  | exp '^' exp                       { $$ = PP_mkbnode(PT_OP_POWER,  $1, $3); }
 
   | '(' exp ')'                       { $$ = $2; }
 
-  | '-' exp  %prec NEG                { $$ = mkunode(PT_OP_UMINUS, $2); }
-  | '~' exp                           { $$ = mkunode(PT_OP_NOT, $2); }
+  | '-' exp  %prec NEG                { $$ = PP_mkunode(PT_OP_UMINUS, $2); }
+  | '~' exp                           { $$ = PP_mkunode(PT_OP_NOT, $2); }
 
-  | TOK_STR '(' exp ')'               { $$ = mkfnode($1, $3);
-                                        txfree((void*)$1);
+  | TOK_STR '(' exp ')'               { $$ = PP_mkfnode($1, $3);
+                                        txfree($1);
                                         if(!$$)
                                             YYABORT;
                                       }
 
-  | exp '=' exp                       { $$ = mkbnode(PT_OP_EQ, $1, $3); }
-  | exp TOK_NE exp                    { $$ = mkbnode(PT_OP_NE, $1, $3); }
-  | exp '>' exp                       { $$ = mkbnode(PT_OP_GT, $1, $3); }
-  | exp '<' exp                       { $$ = mkbnode(PT_OP_LT, $1, $3); }
-  | exp TOK_GE exp                    { $$ = mkbnode(PT_OP_GE, $1, $3); }
-  | exp TOK_LE exp                    { $$ = mkbnode(PT_OP_LE, $1, $3); }
+  | exp '=' exp                       { $$ = PP_mkbnode(PT_OP_EQ, $1, $3); }
+  | exp TOK_NE exp                    { $$ = PP_mkbnode(PT_OP_NE, $1, $3); }
+  | exp '>' exp                       { $$ = PP_mkbnode(PT_OP_GT, $1, $3); }
+  | exp '<' exp                       { $$ = PP_mkbnode(PT_OP_LT, $1, $3); }
+  | exp TOK_GE exp                    { $$ = PP_mkbnode(PT_OP_GE, $1, $3); }
+  | exp TOK_LE exp                    { $$ = PP_mkbnode(PT_OP_LE, $1, $3); }
 
-  | exp '&' exp                       { $$ = mkbnode(PT_OP_AND, $1, $3); }
-  | exp '|' exp                       { $$ = mkbnode(PT_OP_OR,  $1, $3); }
+  | exp '&' exp                       { $$ = PP_mkbnode(PT_OP_AND, $1, $3); }
+  | exp '|' exp                       { $$ = PP_mkbnode(PT_OP_OR,  $1, $3); }
 
-  | exp '[' exp ']'                   { $$ = mkbnode(PT_OP_INDX,  $1, $3); }
-  | exp TOK_LRANGE exp TOK_RRANGE     { $$ = mkbnode(PT_OP_RANGE, $1, $3); }
-  | exp '?' exp ':' exp               { $$ = mkbnode(PT_OP_TERNARY,$1,
-                                                     mkbnode(PT_OP_COMMA,$3,$5)); }
+  | exp '[' exp ']'                   { $$ = PP_mkbnode(PT_OP_INDX,  $1, $3); }
+  | exp '[' '['  exp ']' ']'          { $$ = PP_mkbnode(PT_OP_RANGE, $1, $4); }
+  | exp '?' exp ':' exp               { $$ = PP_mkbnode(PT_OP_TERNARY,$1,
+                                                     PP_mkbnode(PT_OP_COMMA,$3,$5)); }
 ;
 
 %%
@@ -179,6 +173,8 @@ PPerror (YYLTYPE *locp, char **line, struct pnode **retval, char const *s)
   NG_IGNORE(locp);
   NG_IGNORE(line);
   NG_IGNORE(retval);
-
-  fprintf (stderr, "%s: %s\n", __func__, s);
+  char *tmpstr = strstr(keepline, *line);
+  int len = (int)strlen(keepline);
+  fprintf (stderr, "%s: %s in line segment\n   %s\nnear\n   %*s\n",
+      __func__, s, keepline, len, tmpstr);
 }

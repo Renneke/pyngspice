@@ -33,7 +33,7 @@ NUMOStemp(GENmodel *inModel, CKTcircuit *ckt)
 
 
   /* loop through all the models */
-  for (; model != NULL; model = model->NUMOSnextModel) {
+  for (; model != NULL; model = NUMOSnextModel(model)) {
     methods = model->NUMOSmethods;
     models = model->NUMOSmodels;
     options = model->NUMOSoptions;
@@ -54,8 +54,8 @@ NUMOStemp(GENmodel *inModel, CKTcircuit *ckt)
     MatchingMobility = models->MODLmatchingMobility;
     OneCarrier = methods->METHoneCarrier;
 
-    for (inst = model->NUMOSinstances; inst != NULL;
-	inst = inst->NUMOSnextInstance) {
+    for (inst = NUMOSinstances(model); inst != NULL;
+         inst = NUMOSnextInstance(inst)) {
 
       startTime = SPfrontEnd->IFseconds();
 
@@ -81,7 +81,7 @@ NUMOStemp(GENmodel *inModel, CKTcircuit *ckt)
 
 	/* Copy everything, then fix the incorrect pointer. */
 	pNextMaterial = pMaterial->next;
-	bcopy(pM, pMaterial, sizeof(TWOmaterial));
+	memcpy(pMaterial, pM, sizeof(TWOmaterial));
 	pMaterial->next = pNextMaterial;
 
 	/* Now do the temperature dependence. */

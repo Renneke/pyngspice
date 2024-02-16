@@ -61,7 +61,7 @@ URCsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *state)
     ctype = CKTtypelook("Capacitor");
     dtype = CKTtypelook("Diode");
     /*  loop through all the URC models */
-    for( ; model != NULL; model = model->URCnextModel ) {
+    for( ; model != NULL; model = URCnextModel(model)) {
 	if(!model->URCkGiven)
 	    model->URCk = 1.5;
 	if(!model->URCfmaxGiven)
@@ -74,8 +74,8 @@ URCsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *state)
 /* may need to put in limits:  k>=1.1, freq <=1e9, rperl >=.1 */
 
         /* loop through all the instances of the model */
-        for (here = model->URCinstances; here != NULL ;
-                here=here->URCnextInstance)
+        for (here = URCinstances(model); here != NULL ;
+                here=URCnextInstance(here))
 	{
             p = model->URCk;
             r0 = here->URClength * model->URCrPerL;
@@ -130,16 +130,14 @@ URCsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *state)
             lowl = CKTnum2nod(ckt,here->URCposNode);
             hir = CKTnum2nod(ckt,here->URCnegNode);
             for(i=1;i<=here->URClumps;i++) {
-                namehi = TMALLOC(char, 10);
-                (void)sprintf(namehi,"hi%d",i);
+                namehi = tprintf("hi%d", i);
                 error = CKTmkVolt(ckt, &nodehi, here->URCname, namehi);
                 if(error) return(error);
                 hil = nodehi;
                 if(i==here->URClumps) {
                     lowr = hil;
                 } else {
-                    namelo = TMALLOC(char, 10);
-                    (void)sprintf(namelo,"lo%d",i);
+                    namelo = tprintf("lo%d", i);
                     error = CKTmkVolt(ckt, &nodelo, here->URCname,
                             namelo);
                     if(error) return(error);
@@ -148,8 +146,7 @@ URCsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *state)
                 r = prop*r1;
                 c = prop*c1;
 
-                nameelt = TMALLOC(char, 10);
-                (void)sprintf(nameelt,"rlo%d",i);
+                nameelt = tprintf("rlo%d", i);
                 error = SPfrontEnd->IFnewUid (ckt, &eltUid, here->URCname,
                         nameelt, UID_INSTANCE, NULL);
                 if(error) return(error);
@@ -164,8 +161,7 @@ URCsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *state)
                 error = CKTpName("resistance",&ptemp,ckt,rtype,nameelt,&fast);
                 if(error) return(error);
 
-                nameelt = TMALLOC(char, 10);
-                (void)sprintf(nameelt,"rhi%d",i);
+                nameelt = tprintf("rhi%d", i);
                 error = SPfrontEnd->IFnewUid (ckt, &eltUid, here->URCname,
                         nameelt, UID_INSTANCE, NULL);
                 if(error) return(error);
@@ -182,8 +178,7 @@ URCsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *state)
 
                 if(model->URCisPerLGiven) {
                     /* use diode */
-                    nameelt = TMALLOC(char, 10);
-                    (void)sprintf(nameelt,"dlo%d",i);
+                    nameelt = tprintf("dlo%d", i);
                     error = SPfrontEnd->IFnewUid (ckt, &eltUid,
                             here->URCname,nameelt,UID_INSTANCE, 
                             NULL);
@@ -201,8 +196,7 @@ URCsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *state)
                     if(error) return(error);
                 } else {
                     /* use simple capacitor */
-                    nameelt = TMALLOC(char, 10);
-                    (void)sprintf(nameelt,"clo%d",i);
+                    nameelt = tprintf("clo%d", i);
                     error = SPfrontEnd->IFnewUid (ckt, &eltUid, here->URCname
                             ,nameelt, UID_INSTANCE, NULL);
                     if(error) return(error);
@@ -223,8 +217,7 @@ URCsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *state)
                 if(i!=here->URClumps){
                     if(model->URCisPerLGiven) {
                         /* use diode */
-                        nameelt = TMALLOC(char, 10);
-                        (void)sprintf(nameelt,"dhi%d",i);
+                        nameelt = tprintf("dhi%d", i);
                         error = SPfrontEnd->IFnewUid (ckt, &eltUid,
                                 here->URCname,nameelt,UID_INSTANCE,
                                 NULL);
@@ -242,8 +235,7 @@ URCsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *state)
                         if(error) return(error);
                     } else {
                         /* use simple capacitor */
-                        nameelt = TMALLOC(char, 10);
-                        (void)sprintf(nameelt,"chi%d",i);
+                        nameelt = tprintf("chi%d", i);
                         error = SPfrontEnd->IFnewUid (ckt, &eltUid,
                                 here->URCname,nameelt,UID_INSTANCE,
                                 NULL);
@@ -283,9 +275,9 @@ URCunsetup(GENmodel *inModel, CKTcircuit *ckt)
 
     /* Delete models, devices, and intermediate nodes; */
 
-    for ( ; model; model = model->URCnextModel) {
-	for (here = model->URCinstances; here;
-	     here = here->URCnextInstance)
+    for ( ; model; model = URCnextModel(model)) {
+	for (here = URCinstances(model); here;
+	     here = URCnextInstance(here))
 	{
 	    if(model->URCisPerLGiven) {
 		/* Diodes */
@@ -310,7 +302,7 @@ URCunsetup(GENmodel *inModel, CKTcircuit *ckt)
 		return E_NOMOD;
 
 	    for (in = modfast->GENinstances; in; in = in->GENnextInstance)
-		CKTdltNNum(ckt, in->GENnode1);
+		CKTdltNNum(ckt, GENnode(in)[0]);
 
 	    CKTdltMod(ckt, modfast);	/* Does the elements too */
 

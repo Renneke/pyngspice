@@ -17,6 +17,7 @@ Author: 1988 Jeffrey M. Hsu
 
 struct _keyed;
 
+#define GRAPH_UNITS_LENGTH  20
 
 /* Device-independent data structure for plots. */
 
@@ -31,6 +32,8 @@ struct graph {
 
     int currentcolor;
     int linestyle;
+
+    bool nolegend;
 
     struct {
         int height, width;
@@ -60,6 +63,7 @@ struct graph {
 
     int ticmarks;           /* mark every ticmark'th point */
     double *ticdata;
+    char ticchar[2];
     int fontwidth, fontheight;  /* for use in grid */
 
     PLOTTYPE plottype;      /* defined in FTEconstant.h */
@@ -68,7 +72,7 @@ struct graph {
       int circular;         /* TRUE if circular plot area */
       union {
         struct {
-                char units[16];     /* unit labels */
+                char units[GRAPH_UNITS_LENGTH];  /* unit labels */
                 int     spacing, numspace;
                 double  distance, lowlimit, highlimit;
                 int     mult;
@@ -79,11 +83,11 @@ struct graph {
                 int     digits;
         } lin;
         struct {
-                char units[16];     /* unit labels */
+                char units[GRAPH_UNITS_LENGTH];  /* unit labels */
                 int hmt, lmt, decsp, subs, pp;
         } log;
         struct {
-                char units[16];     /* unit labels */
+                char units[GRAPH_UNITS_LENGTH];  /* unit labels */
                 int radius, center;
                 double mrad;
                 int lmt;
@@ -96,21 +100,6 @@ struct graph {
       char *xlabel, *ylabel;
     } grid;
 
-    int numbuttons;     /* number of buttons */
-    struct {
-      int id;
-      char *message;
-    } *buttons;
-    int buttonsxoff;    /* viewportxoff + x size of viewport */
-    int buttonsyoff;
-
-    struct {
-      int width, height;
-      char message[161];        /* two lines of text */
-    } messagebox;
-    int messagexoff;
-    int messageyoff;
-
     /* characters the user typed on graph */
     /* note: think up better names */
     struct _keyed *keyed;
@@ -118,11 +107,21 @@ struct graph {
     /* for zoomin */
     char *commandline;
 
+    /* colors used */
+    unsigned long colorarray[25];
+
+    /* we have a mother graph */
+    int mgraphid;
+
+    /* linewidths */
+    int graphwidth;
+    int gridwidth;
+
     /* Space here is allocated by NewViewport
         and de-allocated by DestroyGraph.
     */
     void *devdep;
-
+    size_t n_byte_devdep; /* Size of devdep. Needed to allow copying */
 };
 
 
@@ -136,8 +135,6 @@ struct _keyed {
     struct _keyed *next;
 };
 
-
-#define NEWGRAPH TMALLOC(GRAPH, 1)
 
 #define rnd(x)  (int) ((x)+0.5)
 

@@ -37,10 +37,10 @@ void
 com_meas(wordlist *wl)
 {
     /* wl: in, input line of meas command */
-    char *line_in, *outvar, newvec[1000];
+    char *line_in, *outvar;
     wordlist *wl_count, *wl_let;
 
-    char *vec_found, *token, *equal_ptr, newval[256];
+    char *vec_found, *token, *equal_ptr;
     wordlist *wl_index;
     struct dvec *d;
     int err = 0;
@@ -67,6 +67,12 @@ com_meas(wordlist *wl)
            May be in the next wl_word */
         if (token[strlen(token) - 1] == '=') {
             wl_index = wl_index->wl_next;
+            if (wl_index == NULL) {
+                line_in = wl_flatten(wl);
+                fprintf(stderr, "\nError: meas failed due to missing token in \n    meas %s \n\n", line_in);
+                tfree(line_in);
+                return;
+            }
             vec_found = wl_index->wl_word;
             /* token may be already a value, maybe 'LAST', which we have to keep, or maybe a vector */
             if (!cieq(vec_found, "LAST")) {
@@ -79,15 +85,14 @@ com_meas(wordlist *wl)
                        of the rigt hand side does make sense */
                     if (d && (d->v_length == 1) && (d->v_numdims == 1)) {
                         /* get its value */
-                        sprintf(newval, "%e", d->v_realdata[0]);
+                        wl_index->wl_word = tprintf("%e", d->v_realdata[0]);
                         tfree(vec_found);
-                        wl_index->wl_word = copy(newval);
                     }
                 }
             }
         }
         /* may be inside the same wl_word */
-        else if ((equal_ptr = strstr(token, "=")) != NULL) {
+        else if ((equal_ptr = strchr(token, '=')) != NULL) {
             vec_found = equal_ptr + 1;
             if (!cieq(vec_found, "LAST")) {
                 INPevaluate(&vec_found, &err, 1);
@@ -96,11 +101,10 @@ com_meas(wordlist *wl)
                     /* Only if we have a single valued vector, replacing
                     of the rigt hand side does make sense */
                     if (d && (d->v_length == 1) && (d->v_numdims == 1)) {
-                        *equal_ptr = '\0';
-                        sprintf(newval, "%s=%e", token, d->v_realdata[0]);
-                        // memory leak with first part of vec_found ?
+                        int lhs_len = (int)(equal_ptr - token);
+                        wl_index->wl_word =
+                            tprintf("%.*s=%e", lhs_len, token, d->v_realdata[0]);
                         tfree(token);
-                        wl_index->wl_word = copy(newval);
                     }
                 }
             }
@@ -118,6 +122,7 @@ com_meas(wordlist *wl)
         fprintf(stdout,
                 " meas %s failed!\n"
                 "   unspecified output var name\n\n", line_in);
+        tfree(line_in);
         return;
     }
     outvar = wl_count->wl_word;
@@ -126,11 +131,11 @@ com_meas(wordlist *wl)
 
     if (fail) {
         fprintf(stdout, " meas %s failed!\n\n", line_in);
+        tfree(line_in);
         return;
     }
 
-    sprintf(newvec, "%s = %e", outvar, result);
-    wl_let = wl_cons(copy(newvec), NULL);
+    wl_let = wl_cons(tprintf("%s = %e", outvar, result), NULL);
     com_let(wl_let);
     wl_free(wl_let);
     tfree(line_in);
@@ -175,7 +180,7 @@ get_double_value(
 
             *value = INPevaluate(&junk, &err, 1);
         } else {
-            if ((equal_ptr = strstr(token, "=")) != NULL) {
+            if ((equal_ptr = strchr(token, '=')) != NULL) {
                 equal_ptr += 1;
                 *value = INPevaluate(&equal_ptr, &err, 1);
             } else {
@@ -210,7 +215,7 @@ do_measure(
     bool chk_only /*in: TRUE if checking for "autostop", FALSE otherwise*/
 )
 {
-    struct line *meas_card, *meas_results = NULL, *end = NULL, *newcard;
+    struct card *meas_card, *meas_results = NULL, *end = NULL, *newcard;
     char        *line, *an_name, *an_type, *resname, *meastype, *str_ptr, out_line[1000];
     int         ok = 0;
     int         fail;
@@ -226,7 +231,7 @@ do_measure(
         SetAnalyse("meas", 0);
 #endif
 
-    an_name = strdup(what); /* analysis type, e.g. "tran" */
+    an_name = copy(what); /* analysis type, e.g. "tran" */
     strtolower(an_name);
     measure_word_list = NULL;
     measures_passed = TRUE;
@@ -240,7 +245,7 @@ do_measure(
     }
 
     /* don't allow autostop if no .meas commands are given in the input file */
-    if ((cp_getvar("autostop", CP_BOOL, NULL)) && (ft_curckt->ci_meas == NULL)) {
+    if ((cp_getvar("autostop", CP_BOOL, NULL, 0)) && (ft_curckt->ci_meas == NULL)) {
         fprintf(cp_err, "\nWarning: No .meas commands found!\n");
         fprintf(cp_err, "  Option autostop is not available, ignored!\n\n");
         cp_remvar("autostop");
@@ -262,10 +267,10 @@ do_measure(
        */
 
     /* first pass through .meas cards: evaluate everything except param|expr */
-    for (meas_card = ft_curckt->ci_meas; meas_card != NULL; meas_card = meas_card->li_next) {
-        line = meas_card->li_line;
+    for (meas_card = ft_curckt->ci_meas; meas_card != NULL; meas_card = meas_card->nextcard) {
+        line = meas_card->line;
 
-        txfree(gettok(&line)); /* discard .meas */
+        line = nexttok(line); /* discard .meas */
 
         an_type = gettok(&line);
         resname = gettok(&line);
@@ -273,8 +278,8 @@ do_measure(
 
         if (chkAnalysisType(an_type) != TRUE) {
             if (!chk_only) {
-                fprintf(cp_err, "Error: unrecognized analysis type '%s' for the following .meas statement on line %d:\n", an_type, meas_card->li_linenum);
-                fprintf(cp_err, "       %s\n", meas_card->li_line);
+                fprintf(cp_err, "Error: unrecognized analysis type '%s' for the following .meas statement on line %d:\n", an_type, meas_card->linenum);
+                fprintf(cp_err, "       %s\n", meas_card->line);
             }
 
             txfree(an_type);
@@ -292,8 +297,12 @@ do_measure(
         }
 
         /* skip param|expr measurement types for now -- will be done after other measurements */
-        if (strncmp(meastype, "param", 5) == 0 || strncmp(meastype, "expr", 4) == 0)
+        if (strncmp(meastype, "param", 5) == 0 || strncmp(meastype, "expr", 4) == 0) {
+            txfree(an_type);
+            txfree(resname);
+            txfree(meastype);
             continue;
+        }
 
         /* skip .meas line, if analysis type from line and name of analysis performed differ */
         if (strcmp(an_name, an_type) != 0) {
@@ -306,13 +315,13 @@ do_measure(
         /* New way of processing measure statements using common code
            in fcn get_measure2() (com_measure2.c)*/
         out_line[0] = '\0';
-        measure_word_list = measure_parse_line(meas_card->li_line);
+        measure_word_list = measure_parse_line(meas_card->line);
         if (measure_word_list) {
             fail = get_measure2(measure_word_list, &result, out_line, chk_only);
             if (fail) {
                 measures_passed = FALSE;
                 if (!chk_only)
-                    fprintf(stderr, " %s failed!\n\n", meas_card->li_line);
+                    fprintf(stderr, " %s failed!\n\n", meas_card->line);
                 num_failed++;
                 if (chk_only) {
                     /* added for speed - cleanup last parse and break */
@@ -333,14 +342,14 @@ do_measure(
         }
 
         if (!chk_only) {
-            newcard          = alloc(struct line);
-            newcard->li_line = strdup(out_line);
-            newcard->li_next = NULL;
+            newcard          = TMALLOC(struct card, 1);
+            newcard->line = copy(out_line);
+            newcard->nextcard = NULL;
 
             if (meas_results == NULL) {
                 meas_results = end = newcard;
             } else {
-                end->li_next = newcard;
+                end->nextcard = newcard;
                 end          = newcard;
             }
         }
@@ -357,10 +366,10 @@ do_measure(
     }
     /* second pass through .meas cards: now do param|expr .meas statements */
     newcard = meas_results;
-    for (meas_card = ft_curckt->ci_meas; meas_card != NULL; meas_card = meas_card->li_next) {
-        line = meas_card->li_line;
+    for (meas_card = ft_curckt->ci_meas; meas_card != NULL; meas_card = meas_card->nextcard) {
+        line = meas_card->line;
 
-        txfree(gettok(&line)); /* discard .meas */
+        line = nexttok(line); /* discard .meas */
 
         an_type = gettok(&line);
         resname = gettok(&line);
@@ -368,8 +377,8 @@ do_measure(
 
         if (chkAnalysisType(an_type) != TRUE) {
             if (!chk_only) {
-                fprintf(cp_err, "Error: unrecognized analysis type '%s' for the following .meas statement on line %d:\n", an_type, meas_card->li_linenum);
-                fprintf(cp_err, "       %s\n", meas_card->li_line);
+                fprintf(cp_err, "Error: unrecognized analysis type '%s' for the following .meas statement on line %d:\n", an_type, meas_card->linenum);
+                fprintf(cp_err, "       %s\n", meas_card->line);
             }
 
             txfree(an_type);
@@ -387,11 +396,11 @@ do_measure(
         if (strncmp(meastype, "param", 5) != 0 && strncmp(meastype, "expr", 4) != 0) {
 
             if (!chk_only)
-                fprintf(stdout, "%s", newcard->li_line);
+                fprintf(stdout, "%s", newcard->line);
             end     = newcard;
-            newcard = newcard->li_next;
+            newcard = newcard->nextcard;
 
-            txfree(end->li_line);
+            txfree(end->line);
             txfree(end);
 
             txfree(an_type);
@@ -404,10 +413,10 @@ do_measure(
             fprintf(stdout, "%-20s=", resname);
 
         if (!chk_only) {
-            ok = nupa_eval(meas_card->li_line, meas_card->li_linenum, meas_card->li_linenum_orig);
+            ok = nupa_eval(meas_card);
 
             if (ok) {
-                str_ptr = strstr(meas_card->li_line, meastype);
+                str_ptr = strstr(meas_card->line, meastype);
                 if (!get_double_value(&str_ptr, meastype, &result, chk_only)) {
                     if (!chk_only)
                         fprintf(stdout, "   failed\n");
@@ -448,7 +457,7 @@ check_autostop(char* what)
 {
     bool flag = FALSE;
 
-    if (cp_getvar("autostop", CP_BOOL, NULL))
+    if (cp_getvar("autostop", CP_BOOL, NULL, 0))
         flag = do_measure(what, TRUE);
 
     return flag;
@@ -467,7 +476,7 @@ measure_parse_line(char *line)
     char *extra_item;                   /* extra item */
 
     wl = NULL;
-    txfree(gettok(&line));
+    line = nexttok(line);
     do {
         item = gettok(&line);
         if (!(item))

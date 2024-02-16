@@ -16,10 +16,11 @@ qaSpecFile="qaSpec"
 qaResultsDirectory="results"
 testProgramName="$(dirname $0)/runQaTests.pl"
 if [ -z "$testProgramFlags" ] ; then
-    testProgramFlags="-nwV"
+    testProgramFlags="-nw"
 fi
 
-#testProgramFlags="-d"
+# uncomment this to preserve netlist after test:
+# testProgramFlags="-d -V"
 
 
 help() {
@@ -29,6 +30,10 @@ help() {
         all                run tests and compare results for all simulators
 
         ngspice            run tests and compare results ngspice
+
+        hspice             run tests and compare results hspice
+
+        ads             run tests and compare results ads
 
         clean              remove all previously generated simulation results
 
@@ -42,8 +47,13 @@ run_test() {
 
     simname="$1"
 
-    localPlatform=`${testProgramName} -platform`
-    localVersion=`${testProgramName} -sv -s ${simname} ${qaSpecFile}`
+    for i in $(${testProgramName} ${testProgramFlags} -s ${simname} --tuple) ; do
+        case "${i%%=*}" in
+            platform)  localPlatform="${i#*=}";;
+            version)   localVersion="${i#*=}";;
+            vaVersion) localVaVersion="${i#*=}";;
+        esac
+    done
 
     echo ""
     echo "******"
@@ -62,6 +72,9 @@ run_test() {
                 -s ${simname} \
                 -r -t ${test} \
                 -var ${variant} \
+                --version=${localVersion} \
+                --vaVersion=${localVaVersion} \
+                --platform=${platform} \
                 --results=${qaResultsDirectory} \
                 ${qaSpecFile}
         done
@@ -70,7 +83,7 @@ run_test() {
     for version in `ls -C1 ${qaResultsDirectory}/${simname}` ; do
         for platform in `ls -C1 ${qaResultsDirectory}/${simname}/${version}` ; do
 
-            if [ ${version} = ${localVersion}  -a  ${platform} = ${localPlatform} ]
+            if [ "${version}" = "${localVersion}" -a "${platform}" = "${localPlatform}" ]
             then
                 break
             fi
@@ -92,6 +105,9 @@ run_test() {
                         -s ${simname} \
                         -t ${test} \
                         -var ${variant} \
+                        --version=${localVersion} \
+                        --vaVersion=${localVaVersion} \
+                        --platform=${platform} \
                         --results=${qaResultsDirectory} \
                         ${qaSpecFile}
                 done
@@ -102,22 +118,47 @@ run_test() {
 
 
 #####
-##### ngspice tests
+##### tests
 #####
 
 ngspice() {
     run_test ngspice
 }
 
+hspice() {
+    run_test hspice
+}
 
+ads() {
+    run_test ads
+}
+
+
+#####
+##### clean
+#####
 
 clean() {
     rm -rf ${qaResultsDirectory}/ngspice ngspiceCkt*
+    rm -rf ${qaResultsDirectory}/hspice hspiceCkt*
+    rm -rf ${qaResultsDirectory}/ads adsCkt*
+}
+
+clean_ngspice() {
+    rm -rf ${qaResultsDirectory}/ngspice ngspiceCkt*
+}
+
+clean_hspice() {
+    rm -rf ${qaResultsDirectory}/hspice hspiceCkt*
+}
+
+clean_ads() {
+    rm -rf ${qaResultsDirectory}/ads adsCkt*
 }
 
 
 all() {
-    ngspice
+    ngspice hspice ads
 }
 
 
@@ -143,7 +184,7 @@ done
 
 for arg in $@ ; do
     case "$arg" in
-        all | clean | ngspice)
+        all | clean | clean_ngspice | ngspice | clean_hspice | hspice | clean_ads | ads)
             "$arg"
             ;;
         *)

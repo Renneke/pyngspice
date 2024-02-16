@@ -3,10 +3,10 @@
 
 FILE s_xfer/cfunc.mod
 
-Copyright 1991
-Georgia Tech Research Corporation, Atlanta, Ga. 30332
-All Rights Reserved
+Public Domain
 
+Georgia Tech Research Corporation
+Atlanta, Georgia 30332
 PROJECT A-8503-405
                
 
@@ -135,10 +135,10 @@ double mag_x, phase_x, mag_y, phase_y;
 
 Mif_Complex_t out;
                                      
-mag_x = sqrt( (x.real * x.real) + (x.imag * x.imag) );
+mag_x = hypot(x.real, x.imag);
 phase_x = atan2(x.imag, x.real);
 
-mag_y = sqrt( (y.real * y.real) + (y.imag * y.imag) );
+mag_y = hypot(y.real, y.imag);
 phase_y = atan2(y.imag, y.real);
                
 mag_x = mag_x/mag_y;

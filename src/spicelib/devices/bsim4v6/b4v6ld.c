@@ -76,25 +76,26 @@ CKTcircuit *ckt)
 #ifdef USE_OMP
     int idx;
     BSIM4v6model *model = (BSIM4v6model*)inModel;
-    int good = 0;
-    BSIM4v6instance *here;
+    int error = 0;
     BSIM4v6instance **InstArray;
     InstArray = model->BSIM4v6InstanceArray;
 
-#pragma omp parallel for private(here)
+#pragma omp parallel for
     for (idx = 0; idx < model->BSIM4v6InstCount; idx++) {
-        here = InstArray[idx];
-        good = BSIM4v6LoadOMP(here, ckt);
+        BSIM4v6instance *here = InstArray[idx];
+        int local_error = BSIM4v6LoadOMP(here, ckt);
+        if (local_error)
+            error = local_error;
     }
 
     BSIM4v6LoadRhsMat(inModel, ckt);
     
-    return good;
+    return error;
 }
 
 
 int BSIM4v6LoadOMP(BSIM4v6instance *here, CKTcircuit *ckt) {
-BSIM4v6model *model;
+BSIM4v6model *model = BSIM4v6modPtr(here);
 #else
 BSIM4v6model *model = (BSIM4v6model*)inModel;
 BSIM4v6instance *here;
@@ -240,10 +241,6 @@ int ByPass, ChargeComputationNeeded, error, Check, Check1, Check2;
 
 double m;
 
-#ifdef USE_OMP
-model = here->BSIM4v6modPtr;
-#endif
-
 ScalingFactor = 1.0e-9;
 ChargeComputationNeeded =  
                  ((ckt->CKTmode & (MODEAC | MODETRAN | MODEINITSMSIG)) ||
@@ -251,9 +248,9 @@ ChargeComputationNeeded =
                  ? 1 : 0;
 
 #ifndef USE_OMP
-for (; model != NULL; model = model->BSIM4v6nextModel)
-{    for (here = model->BSIM4v6instances; here != NULL; 
-          here = here->BSIM4v6nextInstance)
+for (; model != NULL; model = BSIM4v6nextModel(model))
+{    for (here = BSIM4v6instances(model); here != NULL; 
+          here = BSIM4v6nextInstance(here))
      {
 #endif
 
@@ -4871,7 +4868,7 @@ line900:
            here->BSIM4v6_25 = m * (gcrgb + gcgmbb);
 
            here->BSIM4v6_26 = m * gcdgmb;
-           here->BSIM4v6_26 = m * gcrg;
+           here->BSIM4v6_27 = m * gcrg;
            here->BSIM4v6_28 = m * gcsgmb;
            here->BSIM4v6_29 = m * gcbgmb;
 
@@ -5203,7 +5200,7 @@ int BSIM4v6polyDepletion(
 #ifdef USE_OMP
 void BSIM4v6LoadRhsMat(GENmodel *inModel, CKTcircuit *ckt)
 {
-    unsigned int InstCount, idx;
+    int InstCount, idx;
     BSIM4v6instance **InstArray;
     BSIM4v6instance *here;
     BSIM4v6model *model = (BSIM4v6model*)inModel;
@@ -5213,6 +5210,7 @@ void BSIM4v6LoadRhsMat(GENmodel *inModel, CKTcircuit *ckt)
 
     for(idx = 0; idx < InstCount; idx++) {
        here = InstArray[idx];
+       model = BSIM4v6modPtr(here);
         /* Update b for Ax = b */
            (*(ckt->CKTrhs + here->BSIM4v6dNodePrime) += here->BSIM4v6rhsdPrime);
            (*(ckt->CKTrhs + here->BSIM4v6gNodePrime) -= here->BSIM4v6rhsgPrime);

@@ -3,11 +3,10 @@ FILE    IPCtiein.c
 
 MEMBER OF process XSPICE
 
-Copyright 1991
+Public Domain
+
 Georgia Tech Research Corporation
 Atlanta, Georgia 30332
-All Rights Reserved
-
 PROJECT A-8503
 
 AUTHORS
@@ -335,8 +334,8 @@ Ipc_Boolean_t ipc_screen_name(char *name, char *mapped_name)
                 return(IPC_FALSE);
         }
         else {
-            if(islower(name[i]))
-                mapped_name[i] = (char) toupper(name[i]);
+            if(islower_c(name[i]))
+                mapped_name[i] = toupper_c(name[i]);
             else
                 mapped_name[i] = name[i];
         }
@@ -479,7 +478,7 @@ void ipc_free_devices(
     for(i = 0; i < num_items; i++)
 	{
         FREE(names[i]);
-		names[i] = 0;
+		names[i] = NULL;
 	}
 
     if(num_items > 0) 

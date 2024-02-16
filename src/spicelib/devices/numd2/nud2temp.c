@@ -32,7 +32,7 @@ NUMD2temp(GENmodel *inModel, CKTcircuit *ckt)
   double startTime;
 
   /* loop through all the models */
-  for (; model != NULL; model = model->NUMD2nextModel) {
+  for (; model != NULL; model = NUMD2nextModel(model)) {
     methods = model->NUMD2methods;
     models = model->NUMD2models;
     options = model->NUMD2options;
@@ -53,8 +53,8 @@ NUMD2temp(GENmodel *inModel, CKTcircuit *ckt)
     MatchingMobility = models->MODLmatchingMobility;
     OneCarrier = methods->METHoneCarrier;
 
-    for (inst = model->NUMD2instances; inst != NULL;
-	inst = inst->NUMD2nextInstance) {
+    for (inst = NUMD2instances(model); inst != NULL;
+         inst = NUMD2nextInstance(inst)) {
 
       startTime = SPfrontEnd->IFseconds();
 
@@ -80,7 +80,7 @@ NUMD2temp(GENmodel *inModel, CKTcircuit *ckt)
 
 	/* Copy everything, then fix the incorrect pointer. */
 	pNextMaterial = pMaterial->next;
-	bcopy(pM, pMaterial, sizeof(TWOmaterial));
+	memcpy(pMaterial, pM, sizeof(TWOmaterial));
 	pMaterial->next = pNextMaterial;
 
 	/* Now do the temperature dependence. */

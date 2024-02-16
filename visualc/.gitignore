@@ -4,14 +4,22 @@
 #
 # (compile "git ls-files -i --exclude-standard")
 
-/*
+/codemodels/
+/tmp-bison/
 
-!/include
+/xspice/bin/
+/xspice/cmpp/Debug/
+/xspice/cmpp/Release/
+/xspice/cmpp/tmp-bison/
+/xspice/cmpp/x64/
+/xspice/icm/
+/xspice/intermediate/
 
-!/.gitignore
-!/how-to-ngspice-vstudio.txt
-!/visualc/fftw3/fftw-*/README-ngspice.txt
+/x64/
+/vngspice/
+/vngspice-fftw/
+/sharedspice/
 
-!/*.c
-!/*.sln
-!/*.vcproj
+/.vs/
+*.vc.db
+spinit

@@ -2,6 +2,9 @@
 Copyright 1990 Regents of the University of California.  All rights reserved.
 **********/
 
+/* for SIZE_MAX */
+#include <stdint.h>
+
 /* for thread handling */
 #if defined __MINGW32__ || defined _MSC_VER
 #include <windows.h>
@@ -12,11 +15,6 @@ Copyright 1990 Regents of the University of California.  All rights reserved.
  */
 #include "ngspice/ngspice.h"
 
-/* We need this because some tests in cmaths and some executables other
-   than ngspice and ngnutmeg under LINUX don't know about controlled_exit */
-#if defined HAS_WINGUI || defined SHARED_MODULE
-extern void controlled_exit(int status);
-#endif
 
 #ifdef SHARED_MODULE
 #ifndef HAVE_LIBPTHREAD
@@ -51,8 +49,7 @@ extern mutexType allocMutex;
  * be tmalloc'd.   Return NULL for a request for 0 bytes.
  */
 
-/* New implementation of tmalloc, it uses calloc and does not call bzero()  */
-
+/* New implementation of tmalloc, it uses calloc and does not call memset()  */
 void *
 tmalloc(size_t num)
 {
@@ -90,7 +87,7 @@ tmalloc(size_t num)
 
 
 void *
-trealloc(void *ptr, size_t num)
+trealloc(const void *ptr, size_t num)
 {
   void *s;
 /*saj*/
@@ -100,7 +97,7 @@ trealloc(void *ptr, size_t num)
 #endif
   if (!num) {
     if (ptr)
-      free(ptr);
+      free((void*) ptr);
     return NULL;
   }
 
@@ -113,7 +110,7 @@ trealloc(void *ptr, size_t num)
 #elif defined SHARED_MODULE
   mutex_lock(&allocMutex);
 #endif
-    s = realloc(ptr, num);
+    s = realloc((void*) ptr, num);
 /*saj*/
 #ifdef TCL_MODULE
   Tcl_MutexUnlock(alloc);
@@ -134,7 +131,7 @@ trealloc(void *ptr, size_t num)
 
 
 void
-txfree(void *ptr)
+txfree(const void *ptr)
 {
 /*saj*/
 #ifdef TCL_MODULE
@@ -146,13 +143,57 @@ txfree(void *ptr)
   mutex_lock(&allocMutex);
 #endif
 	if (ptr)
-		free(ptr);
+		free((void*) ptr);
 /*saj*/
 #ifdef TCL_MODULE
   Tcl_MutexUnlock(alloc);
 #elif defined SHARED_MODULE
   mutex_unlock(&allocMutex);
 #endif
-}
+} /* end of function txfree */
 
+#if 0
+/* This function returns the product of a and b if it does not overflow.
+ *
+ * Return codes
+ * 0: No overflow
+ * 1: overflow
+ */
+static inline int product_overflow(size_t a, size_t b, size_t *p_n)
+{
+    /* Some overflow conditions:
+     * a == SIZE_MAX and b > 1
+     * a > 1 and b == SIZE_MAX
+     * a * b < a
+     * a * b < b
+     */
+    if ((a == SIZE_MAX && b > 1) || (a > 1 && b == SIZE_MAX)) {
+        return +1;
+    }
+
+    const size_t n = a * b;
+    if (n < a || n < b) {
+        return +1;
+    }
+
+    *p_n = n;
+    return 0;
+} /* end of function product_overflow */
+
+
+/* Print error related to allocating a product that cannot fit in a
+ * size_t and exit. This function does not return. */
+static void overflow_error(size_t num, size_t size)
+{
+    (void) fprintf(stderr, "Cannot allocate %zu X %zu bytes: "
+            "Product exceeds largest size_t = %zu.\n",
+            num, size, SIZE_MAX);
+#if defined HAS_WINGUI || defined SHARED_MODULE
+    controlled_exit(EXIT_FAILURE);
+#else
+    exit(EXIT_FAILURE);
 #endif
+} /* end of function overflow_error */
+#endif
+
+#endif /* #ifndef HAVE_LIBGC */

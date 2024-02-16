@@ -49,12 +49,12 @@
 
 int $(module)acLoad(GENmodel *inModel, CKTcircuit *ckt)
 {
-  register $(module)model *model = ($(module)model*)inModel;
-  register $(module)instance *here;
-  for ( ; model != NULL; model = model->$(module)nextModel )
+  $(module)model *model = ($(module)model*)inModel;
+  $(module)instance *here;
+  for ( ; model != NULL; model = $(module)nextModel(model) )
   {
     /* loop through all the instances of the model */
-    for (here = model->$(module)instances; here != NULL ; here = here->$(module)nextInstance)
+    for (here = $(module)instances(model); here != NULL ; here = $(module)nextInstance(here))
     {
 <admst:for-each select="jacobian[static='yes']">
   <admst:value-of select="column/name"/>
@@ -84,11 +84,8 @@ int $(module)acLoad(GENmodel *inModel, CKTcircuit *ckt)
 <admst:for-each select="/module">
   <admst:value-of select="attribute[name='ngspicename']/value"/>
   <admst:open file="%sacld.c">
-    <admst:value-of select="/simulator/package_string"/>
-    <admst:text format="/***\n*** Interface: %s\n"/>
-    <admst:value-of select="/simulator/currentdate"/>
-    <admst:value-of select="/simulator/fullname"/>
-    <admst:text format=" *** created by: %s - %s ***/\n"/>
+    <admst:text format="/***\n*** Interface: %(/simulator/package_string)\n"/>
+    <admst:text format=" *** created by: %(/simulator/fullname) ***/\n"/>
     <admst:apply-templates select="." match="code"/>
   </admst:open>
   <admst:value-of select="attribute[name='ngspicename']/value"/>

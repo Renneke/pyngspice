@@ -142,8 +142,10 @@ struct dvec *EVTfindvec(
     }
   }
 
-  if(! found)
+  if(! found) {
+    tfree(name);
     return(NULL);
+  }
 
   /* Get the UDN type index */
   udn_index = node_table[i]->udn_index;
@@ -187,22 +189,16 @@ struct dvec *EVTfindvec(
   /* Allocate dvec structures and assign the vectors into them. */
   /* See FTE/OUTinterface.c:plotInit() for initialization example. */
 
-  scale = TMALLOC(struct dvec, 1);
+  scale = dvec_alloc(MIFcopy("step"),
+                     SV_TIME,
+                     VF_REAL & ~VF_PERMANENT,
+                     i, anal_point_vec);
 
-  scale->v_name = MIFcopy("step");
-  scale->v_type = SV_TIME;
-  scale->v_flags = VF_REAL & ~VF_PERMANENT;
-  scale->v_length = i;
-  scale->v_realdata = anal_point_vec;
-  scale->v_scale = NULL;
+  d = dvec_alloc(name,
+                 SV_VOLTAGE,
+                 VF_REAL & ~VF_PERMANENT,
+                 i, value_vec);
 
-  d = TMALLOC(struct dvec, 1);
-
-  d->v_name = name;
-  d->v_type = SV_VOLTAGE;
-  d->v_flags = VF_REAL & ~VF_PERMANENT;
-  d->v_length = i;
-  d->v_realdata = value_vec;
   d->v_scale = scale;
 
 

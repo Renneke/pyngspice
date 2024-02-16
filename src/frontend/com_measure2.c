@@ -21,8 +21,8 @@ typedef enum {
     MEASUREMENT_FAILURE = 1
 } MEASURE_VAL_T;
 
-#define MEASURE_DEFAULT -1
-#define MEASURE_LAST_TRANSITION  -2
+#define MEASURE_DEFAULT (-1)
+#define MEASURE_LAST_TRANSITION (-2)
 
 typedef struct measure
 {
@@ -54,6 +54,10 @@ typedef enum AnalysisType {
     AT_ERR, AT_ERR1, AT_ERR2, AT_ERR3, AT_MIN_AT, AT_MAX_AT
 } ANALYSIS_TYPE_T;
 
+static void measure_errMessage(const char *mName, const char *mFunction,
+        const char *trigTarg, const char *errMsg, int chk_only);
+
+
 
 /** return precision (either 5 or value of environment variable NGSPICE_MEAS_PRECISION) */
 int
@@ -69,8 +73,8 @@ measure_get_precision(void)
 }
 
 
-static void
-measure_errMessage(char *mName, char *mFunction, char *trigTarg, char *errMsg, int chk_only)
+static void measure_errMessage(const char *mName, const char *mFunction,
+        const char *trigTarg, const char *errMsg, int chk_only)
 {
     if (!chk_only) {
         printf("\nError: measure  %s  %s(%s) : ", mName, mFunction, trigTarg);
@@ -86,33 +90,24 @@ measure_errMessage(char *mName, char *mFunction, char *trigTarg, char *errMsg, i
 static void
 correct_vec(MEASUREPTR meas)
 {
-    char *vec, *vecfirst, newvec[BSIZE_SP];
-    char *vec2, newvec2[BSIZE_SP];
+    char *vec = meas->m_vec;
 
-    vec = meas->m_vec;
     /* return if not of type VM() etc */
-    if ((*vec != 'v') || (!strstr(vec, "(")))
+    if ((*vec != 'v') || (!strchr(vec, '(')))
         return;
 
-    if (*(++vec) != '(') {
-        vecfirst = copy(meas->m_vec);
-        vecfirst[1] = '\0';
-        meas->m_vectype = *vec;
-        sprintf(newvec, "%s%s", vecfirst, strstr(meas->m_vec, "("));
-        tfree(meas->m_vec);
-        tfree(vecfirst);
-        meas->m_vec = copy(newvec);
+    if (vec[1] != '(') {
+        meas->m_vectype = vec[1];
+        meas->m_vec = tprintf("%c%s", vec[0], strchr(vec, '('));
+        tfree(vec);
     }
 
-    vec2 = meas->m_vec2;
-    if (vec2 && (*(++vec2) != '(')) {
-        vecfirst = copy(meas->m_vec);
-        vecfirst[1] = '\0';
-        meas->m_vectype2 = *vec2;
-        sprintf(newvec, "%s%s", vecfirst, strstr(meas->m_vec2, "("));
-        tfree(meas->m_vec2);
-        tfree(vecfirst);
-        meas->m_vec2 = copy(newvec2);
+    vec = meas->m_vec2;
+
+    if (vec && (vec[1] != '(')) {
+        meas->m_vectype2 = vec[1];
+        meas->m_vec2 = tprintf("%c%s", vec[0], strchr(vec, '('));
+        tfree(vec);
     }
 }
 
@@ -125,13 +120,13 @@ get_value(
     int idx              /*in: index of vector value to be read out */
     )
 {
-    double ar, bi, tt;
+    double ar, bi;
 
     ar = values->v_compdata[idx].cx_real;
     bi = values->v_compdata[idx].cx_imag;
 
     if ((meas->m_vectype == 'm') || (meas->m_vectype == 'M')) {
-        return sqrt(ar*ar + bi*bi); /* magnitude */
+        return hypot(ar, bi); /* magnitude */
     } else if ((meas->m_vectype == 'r') || (meas->m_vectype == 'R')) {
         return ar;  /* real value */
     } else if ((meas->m_vectype == 'i') || (meas->m_vectype == 'I')) {
@@ -139,8 +134,7 @@ get_value(
     } else if ((meas->m_vectype == 'p') || (meas->m_vectype == 'P')) {
         return radtodeg(atan2(bi, ar)); /* phase (in degrees) */
     } else if ((meas->m_vectype == 'd') || (meas->m_vectype == 'D')) {
-        tt = sqrt(ar*ar + bi*bi);  /* dB of magnitude */
-        return 20.0 * log10(tt);
+        return 20.0 * log10(hypot(ar, bi));  /* dB of magnitude */
     } else {
         return ar;  /* default: real value */
     }
@@ -350,9 +344,9 @@ measure_extract_variables(char *line)
                 }
             }
         }
-    } while(line && *line);
+    } while (*line);
 
-    return (status);
+    return status;
 }
 
 
@@ -360,7 +354,7 @@ measure_extract_variables(char *line)
  * Function: process a WHEN measurement statement which has been
  * parsed into a measurement structure.
  * ----------------------------------------------------------------- */
-static void
+static int
 com_measure_when(
     MEASUREPTR meas     /* in : parsed measurement structure */
     )
@@ -395,16 +389,16 @@ com_measure_when(
 
     if (d == NULL) {
         fprintf(cp_err, "Error: no such vector as %s.\n", meas->m_vec);
-        return;
+        return MEASUREMENT_FAILURE;
     }
 
     if (has_d2 && (d2 == NULL)) {
         fprintf(cp_err, "Error: no such vector as %s.\n", meas->m_vec2);
-        return;
+        return MEASUREMENT_FAILURE;
     }
     if (dScale == NULL) {
         fprintf(cp_err, "Error: no scale vector.\n");
-        return;
+        return MEASUREMENT_FAILURE;
     }
 
     prevValue = 0.;
@@ -547,13 +541,13 @@ com_measure_when(
                      * exit when we meet condition */
 //                meas->m_measured = prevScaleValue + (value2 - prevValue) * (scaleValue - prevScaleValue) / (value - prevValue);
                     meas->m_measured = prevScaleValue + (prevValue2 - prevValue) * (scaleValue - prevScaleValue) / (value - prevValue - value2 + prevValue2);
-                    return;
+                    return MEASUREMENT_OK;
                 }
                 if  (measurement_pending) {
                     if ((meas->m_cross == MEASURE_DEFAULT) && (meas->m_rise == MEASURE_DEFAULT) && (meas->m_fall == MEASURE_DEFAULT)) {
                         /* user didn't request any option, return the first possible case */
                         meas->m_measured = prevScaleValue + (prevValue2 - prevValue) * (scaleValue - prevScaleValue) / (value - prevValue - value2 + prevValue2);
-                        return;
+                        return MEASUREMENT_OK;
                     } else if ((meas->m_cross == MEASURE_LAST_TRANSITION) || (meas->m_rise == MEASURE_LAST_TRANSITION) || (meas->m_fall == MEASURE_LAST_TRANSITION)) {
                         meas->m_measured = prevScaleValue + (prevValue2 - prevValue) * (scaleValue - prevScaleValue) / (value - prevValue - value2 + prevValue2);
                         /* no return - look for last */
@@ -587,13 +581,13 @@ com_measure_when(
                     /* user requested an exact match of cross, rise, or fall
                      * exit when we meet condition */
                     meas->m_measured = prevScaleValue + (meas->m_val - prevValue) * (scaleValue - prevScaleValue) / (value - prevValue);
-                    return;
+                    return MEASUREMENT_OK;
                 }
                 if  (measurement_pending) {
                     if ((meas->m_cross == MEASURE_DEFAULT) && (meas->m_rise == MEASURE_DEFAULT) && (meas->m_fall == MEASURE_DEFAULT)) {
                         /* user didn't request any option, return the first possible case */
                         meas->m_measured = prevScaleValue + (meas->m_val - prevValue) * (scaleValue - prevScaleValue) / (value - prevValue);
-                        return;
+                        return MEASUREMENT_OK;
                     } else if ((meas->m_cross == MEASURE_LAST_TRANSITION) || (meas->m_rise == MEASURE_LAST_TRANSITION) || (meas->m_fall == MEASURE_LAST_TRANSITION)) {
                         meas->m_measured = prevScaleValue + (meas->m_val - prevValue) * (scaleValue - prevScaleValue) / (value - prevValue);
                         /* no return - look for last */
@@ -613,6 +607,8 @@ com_measure_when(
 
     if (init_measured_value)
         meas->m_measured = NAN;
+
+    return MEASUREMENT_OK;
 }
 
 
@@ -621,7 +617,7 @@ com_measure_when(
  * parsed into a measurement structure.  We make sure to interpolate
  * the value when appropriate.
  * ----------------------------------------------------------------- */
-static void
+static int
 measure_at(
     MEASUREPTR meas,            /* in : parsed "at" data */
     double at                   /* in: time to perform measurement */
@@ -633,17 +629,23 @@ measure_at(
     struct dvec *d, *dScale;
 
     psvalue = pvalue = 0;
+
+    if (meas->m_vec == NULL) {
+        fprintf(stderr, "Error: Syntax error in meas line, missing vector\n");
+        return MEASUREMENT_FAILURE;
+    }
+
     d = vec_get(meas->m_vec);
     dScale = plot_cur->pl_scale;
 
     if (d == NULL) {
         fprintf(cp_err, "Error: no such vector as %s.\n", meas->m_vec);
-        return;
+        return MEASUREMENT_FAILURE;
     }
 
     if (dScale == NULL) {
         fprintf(cp_err, "Error: no such vector time, frequency or dc.\n");
-        return;
+        return MEASUREMENT_FAILURE;
     }
 
     /* -----------------------------------------------------------------
@@ -680,10 +682,10 @@ measure_at(
 
         if ((i > 0) && (psvalue <= at) && (svalue >= at)) {
             meas->m_measured = pvalue + (at - psvalue) * (value - pvalue) / (svalue - psvalue);
-            return;
+            return MEASUREMENT_OK;
         } else if  (dc_check && (i > 0) && (psvalue >= at) && (svalue <= at)) {
             meas->m_measured = pvalue + (at - psvalue) * (value - pvalue) / (svalue - psvalue);
-            return;
+            return MEASUREMENT_OK;
         }
 
         psvalue = svalue;
@@ -691,6 +693,7 @@ measure_at(
     }
 
     meas->m_measured = NAN;
+    return MEASUREMENT_OK;
 }
 
 
@@ -700,15 +703,16 @@ measure_at(
  * the value here when we have m_from and m_to constraints * so this
  * function is slightly wrong.   Need to fix in future rev.
  * ----------------------------------------------------------------- */
-static void
+static int
 measure_minMaxAvg(
     MEASUREPTR meas,                /* in : parsed measurement data request */
     ANALYSIS_TYPE_T mFunctionType   /* in: one of AT_AVG, AT_MIN, AT_MAX, AT_MIN_AT, AT_MAX_AT */
     )
 {
-    int i, avgCnt;
+    int i;
     struct dvec *d, *dScale;
     double value, svalue, mValue, mValueAt;
+    double pvalue = 0.0, sprev = 0.0, Tsum = 0.0;
     int first;
     bool ac_check = FALSE, sp_check = FALSE, dc_check = FALSE, tran_check = FALSE;
 
@@ -717,12 +721,16 @@ measure_minMaxAvg(
     meas->m_measured = NAN;
     meas->m_measured_at = NAN;
     first = 0;
-    avgCnt = 0;
+
+    if (meas->m_vec == NULL) {
+        fprintf(cp_err, "Syntax error in meas line\n");
+        return MEASUREMENT_FAILURE;
+    }
 
     d = vec_get(meas->m_vec);
     if (d == NULL) {
         fprintf(cp_err, "Error: no such vector as %s.\n", meas->m_vec);
-        return;
+        return MEASUREMENT_FAILURE;
     }
 
 
@@ -746,12 +754,12 @@ measure_minMaxAvg(
         dScale = vec_get("v-sweep");
     } else {                    /* error */
         fprintf(cp_err, "Error: no such analysis type as %s.\n", meas->m_analysis);
-        return;
+        return MEASUREMENT_FAILURE;
     }
 
     if (dScale == NULL) {
         fprintf(cp_err, "Error: no such vector as time, frquency or v-sweep.\n");
-        return;
+        return MEASUREMENT_FAILURE;
     }
 
     for (i = 0; i < d->v_length; i++) {
@@ -768,7 +776,11 @@ measure_minMaxAvg(
                 value = get_value(meas, d, i); //d->v_compdata[i].cx_real;
             else
                 value = d->v_realdata[i];
-            svalue = dScale->v_realdata[i];
+            if (dScale->v_realdata)
+                svalue = dScale->v_realdata[i];
+            else
+                /* may happen if you write an sp vector and load it again */
+                svalue = dScale->v_compdata[i].cx_real;
         } else {
             value = d->v_realdata[i];
             svalue = dScale->v_realdata[i];
@@ -788,10 +800,27 @@ measure_minMaxAvg(
         }
 
         if (first == 0) {
-            mValue = value;
-            mValueAt = svalue;
             first = 1;
 
+            switch (mFunctionType) {
+            case AT_MIN:
+            case AT_MIN_AT:
+            case AT_MAX_AT:
+            case AT_MAX:
+                mValue = value;
+                mValueAt = svalue;
+                break;
+            case AT_AVG:
+                mValue = 0.0;
+                mValueAt = svalue;
+                Tsum = 0.0;
+                pvalue = value;
+                sprev = svalue;
+                break;
+            default:
+                fprintf(cp_err, "Error: improper min/max/avg call.\n");
+                return MEASUREMENT_FAILURE;
+            }
         } else {
             switch (mFunctionType) {
             case AT_MIN:
@@ -811,12 +840,15 @@ measure_minMaxAvg(
                 break;
             }
             case AT_AVG: {
-                mValue = mValue + value;
-                avgCnt ++;
+                mValue += 0.5 * (value + pvalue) * (svalue - sprev);
+                Tsum += (svalue - sprev);
+                pvalue = value;
+                sprev = svalue;
                 break;
             }
             default :
                 fprintf(cp_err, "Error: improper min/max/avg call.\n");
+                return MEASUREMENT_FAILURE;
             }
 
         }
@@ -825,7 +857,7 @@ measure_minMaxAvg(
     switch (mFunctionType)
     {
     case AT_AVG: {
-        meas->m_measured = (mValue / avgCnt);
+        meas->m_measured = mValue / (first ? Tsum : 1.0);
         meas->m_measured_at = svalue;
         break;
     }
@@ -839,7 +871,9 @@ measure_minMaxAvg(
     }
     default :
         fprintf(cp_err, "Error: improper min/max/avg call.\n");
+        return MEASUREMENT_FAILURE;
     }
+    return MEASUREMENT_OK;
 }
 
 
@@ -848,7 +882,7 @@ measure_minMaxAvg(
  * parsed into a measurement structure.  Here we do interpolate
  * the starting and stopping time window so the answer is correct.
  * ----------------------------------------------------------------- */
-static void
+static int
 measure_rms_integral(
     MEASUREPTR meas,              /* in : parsed measurement data request */
     ANALYSIS_TYPE_T mFunctionType /* in: one of AT_RMS, or AT_INTEG */
@@ -885,7 +919,7 @@ measure_rms_integral(
     d = vec_get(meas->m_vec);
     if (d == NULL) {
         fprintf(cp_err, "Error: no such vector as %s.\n", meas->m_vec);
-        return;
+        return MEASUREMENT_FAILURE;
     }
 
     if (ac_check || sp_check) {
@@ -896,12 +930,12 @@ measure_rms_integral(
         xScale = vec_get("v-sweep");
     } else {                      /* error */
         fprintf(cp_err, "Error: no such analysis type as %s.\n", meas->m_analysis);
-        return;
+        return MEASUREMENT_FAILURE;
     }
 
     if (xScale == NULL) {
         fprintf(cp_err, "Error: no such vector as time.\n");
-        return;
+        return MEASUREMENT_FAILURE;
     }
 
     /* Allocate buffers for calculation. */
@@ -1021,6 +1055,7 @@ measure_rms_integral(
     txfree(x);
     txfree(y);
     txfree(width);
+    return MEASUREMENT_OK;
 }
 
 
@@ -1112,9 +1147,17 @@ measure_valid_vector(
     )
 {
     struct dvec *d;             /* measurement vector */
+    char* ptr;
+    long num;
 
     if (varname == NULL)
         return TRUE;
+
+    /* If varname is a simple number, don't use this as a
+    name of a vetor, but as a number */
+    num = strtol(varname, &ptr, 10);
+    if (*ptr == '\0')
+        return FALSE;
 
     d = vec_get(varname);
     if (d == NULL)
@@ -1139,8 +1182,8 @@ measure_parse_stdParams(
     )
 {
     int pCnt;
-    char *p, *pName, *pValue;
-    double *engVal, engVal1;
+    char *p, *pName = NULL, *pValue;
+    double engVal1;
 
     pCnt = 0;
     while (wl != wlBreak) {
@@ -1157,19 +1200,19 @@ measure_parse_stdParams(
                 wl = wl->wl_next;
                 continue;
             } else {
-                sprintf(errbuf, "bad syntax of ??\n");
-                return 0;
+                sprintf(errbuf, "bad syntax. equal sign missing ?\n");
+                return MEASUREMENT_FAILURE;
             }
         }
 
         if (strcasecmp(pValue, "LAST") == 0) {
             engVal1 = MEASURE_LAST_TRANSITION;
-        } else {
-            if ((engVal = ft_numparse(&pValue, FALSE)) == NULL) {
-                sprintf(errbuf, "bad syntax of ??\n");
-                return 0;
+        }
+        else {
+            if (ft_numparse(&pValue, FALSE, &engVal1) < 0) {
+                sprintf(errbuf, "bad syntax, cannot evaluate right hand side of %s=%s\n", pName, pValue);
+                return MEASUREMENT_FAILURE;
             }
-            engVal1 = *engVal;  // What is this ??
         }
 
         if (strcasecmp(pName, "RISE") == 0) {
@@ -1196,7 +1239,7 @@ measure_parse_stdParams(
             meas->m_at = engVal1;
         } else {
             sprintf(errbuf, "no such parameter as '%s'\n", pName);
-            return 0;
+            return MEASUREMENT_FAILURE;
         }
 
         pCnt ++;
@@ -1204,32 +1247,33 @@ measure_parse_stdParams(
     }
 
     if (pCnt == 0) {
-        sprintf(errbuf, "bad syntax of ??\n");
-        return 0;
+        if (pName)
+            sprintf(errbuf, "bad syntax of %s\n", pName);
+        else
+            sprintf(errbuf, "bad syntax of\n");
+        return MEASUREMENT_FAILURE;
     }
 
     // valid vector
     if (measure_valid_vector(meas->m_vec) == 0) {
         sprintf(errbuf, "no such vector as '%s'\n", meas->m_vec);
-        return 0;
+        return MEASUREMENT_FAILURE;
     }
 
     // valid vector2
     if (meas->m_vec2 != NULL)
         if (measure_valid_vector(meas->m_vec2) == 0) {
             sprintf(errbuf, "no such vector as '%s'\n", meas->m_vec2);
-            return 0;
+            return MEASUREMENT_FAILURE;
         }
 
     /* dc: make m_from always less than m_to */
     if (cieq("dc", meas->m_analysis))
         if (meas->m_to < meas->m_from) {
-            double tmp_val = meas->m_to;
-            meas->m_to = meas->m_from;
-            meas->m_from = tmp_val;
+            SWAP(double, meas->m_from, meas->m_to);
         }
 
-    return 1;
+    return MEASUREMENT_OK;
 }
 
 
@@ -1247,8 +1291,6 @@ measure_parse_find(
     )
 {
     int pCnt;
-    char *p, *pName, *pVal;
-    double *engVal, engVal1;
 
     meas->m_vec = NULL;
     meas->m_vec2 = NULL;
@@ -1270,7 +1312,7 @@ measure_parse_find(
 
     pCnt = 0;
     while (wl != wlBreak) {
-        p = wl->wl_word;
+        char *p = wl->wl_word;
 
         if (pCnt == 0) {
             meas->m_vec = cp_unquote(wl->wl_word);
@@ -1278,38 +1320,35 @@ measure_parse_find(
             if (cieq("ac", meas->m_analysis) || cieq("sp", meas->m_analysis))
                 correct_vec(meas);
         } else if (pCnt == 1) {
-            pName = strtok(p, "=");
-            pVal = strtok(NULL, "=");
+            char * const pName = strtok(p, "=");
+            char * const pVal = strtok(NULL, "=");
 
             if (pVal == NULL) {
                 sprintf(errbuf, "bad syntax of WHEN\n");
-                return 0;
+                return MEASUREMENT_FAILURE;
             }
 
             if (strcasecmp(pName, "AT") == 0) {
-                if ((engVal = ft_numparse(&pVal, FALSE)) == NULL) {
+                if (ft_numparse((char **) &pVal, FALSE, &meas->m_at) < 0) {
                     sprintf(errbuf, "bad syntax of WHEN\n");
-                    return 0;
+                    return MEASUREMENT_FAILURE;
                 }
-
-                engVal1 = *engVal;
-
-                meas->m_at = engVal1;
-
-            } else {
+            }
+            else {
                 sprintf(errbuf, "bad syntax of WHEN\n");
-                return 0;
+                return MEASUREMENT_FAILURE;
             }
         } else {
-            if (measure_parse_stdParams(meas, wl, NULL, errbuf) == 0)
-                return 0;
+            if (measure_parse_stdParams(meas, wl, NULL, errbuf) ==
+                    MEASUREMENT_FAILURE)
+                return MEASUREMENT_FAILURE;
         }
 
         wl = wl->wl_next;
         pCnt ++;
     }
 
-    return 1;
+    return MEASUREMENT_OK;
 }
 
 
@@ -1356,7 +1395,7 @@ measure_parse_when(
 
             if (pVar2 == NULL) {
                 sprintf(errBuf, "bad syntax\n");
-                return 0;
+                return MEASUREMENT_FAILURE;
             }
 
             meas->m_vec = copy(pVar1);
@@ -1372,15 +1411,15 @@ measure_parse_when(
                 meas->m_val = INPevaluate(&pVar2, &err, 1);
             }
         } else {
-            if (measure_parse_stdParams(meas, wl, NULL, errBuf) == 0)
-                return 0;
+            if (measure_parse_stdParams(meas, wl, NULL, errBuf) == MEASUREMENT_FAILURE)
+                return MEASUREMENT_FAILURE;
             break;
         }
 
         wl = wl->wl_next;
         pCnt ++;
     }
-    return 1;
+    return MEASUREMENT_OK;
 }
 
 
@@ -1429,11 +1468,13 @@ measure_parse_trigtarg(
             if (cieq("ac", meas->m_analysis) || cieq("sp", meas->m_analysis))
                 correct_vec(meas);
         } else if (ciprefix("at", p)) {
-            if (measure_parse_stdParams(meas, words, wlTarg, errbuf) == 0)
-                return 0;
+            if (measure_parse_stdParams(meas, words, wlTarg, errbuf) ==
+                    MEASUREMENT_FAILURE)
+                return MEASUREMENT_FAILURE;
         } else {
-            if (measure_parse_stdParams(meas, words, wlTarg, errbuf) == 0)
-                return 0;
+            if (measure_parse_stdParams(meas, words, wlTarg, errbuf) ==
+                    MEASUREMENT_FAILURE)
+                return MEASUREMENT_FAILURE;
             break;
         }
 
@@ -1443,16 +1484,16 @@ measure_parse_trigtarg(
 
     if (pcnt == 0) {
         sprintf(errbuf, "bad syntax of '%s'\n", trigTarg);
-        return 0;
+        return MEASUREMENT_FAILURE;
     }
 
     // valid vector
     if (measure_valid_vector(meas->m_vec) == 0) {
         sprintf(errbuf, "no such vector as '%s'\n", meas->m_vec);
-        return 0;
+        return MEASUREMENT_FAILURE;
     }
 
-    return 1;
+    return MEASUREMENT_OK;
 }
 
 
@@ -1534,6 +1575,8 @@ get_measure2(
                     printf("Error: measure  %s  :\n", mName);
                     printf("\tno such function as '%s'\n", words->wl_word);
                 }
+                tfree(mName);
+                tfree(mAnalysis);
                 return MEASUREMENT_FAILURE;
             }
             break;
@@ -1559,6 +1602,8 @@ get_measure2(
         printf("\tmeasure '%s'  failed\n", mName);
         printf("Error: measure  %s  :\n", mName);
         printf("\tinvalid num params\n");
+        tfree(mName);
+        tfree(mAnalysis);
         return MEASUREMENT_FAILURE;
     }
 
@@ -1587,7 +1632,8 @@ get_measure2(
 
         measTrig->m_analysis = measTarg->m_analysis = mAnalysis;
 
-        if (measure_parse_trigtarg(measTrig, words , wlTarg, "trig", errbuf) == 0) {
+        if (measure_parse_trigtarg(measTrig, words, wlTarg, "trig", errbuf) ==
+                MEASUREMENT_FAILURE) {
             measure_errMessage(mName, mFunction, "TRIG", errbuf, autocheck);
             goto err_ret1;
         }
@@ -1605,7 +1651,8 @@ get_measure2(
         if (words)
             words = words->wl_next; // skip targ
 
-        if (measure_parse_trigtarg(measTarg, words , NULL, "targ", errbuf) == 0) {
+        if (measure_parse_trigtarg(measTarg, words, NULL, "targ", errbuf) ==
+                MEASUREMENT_FAILURE) {
             measure_errMessage(mName, mFunction, "TARG", errbuf, autocheck);
             goto err_ret1;
         }
@@ -1666,7 +1713,7 @@ err_ret1:
 
         meas->m_analysis = measFind->m_analysis = mAnalysis;
 
-        if (measure_parse_find(meas, words, wlWhen, errbuf) == 0) {
+        if (measure_parse_find(meas, words, wlWhen, errbuf) == MEASUREMENT_FAILURE) {
             measure_errMessage(mName, mFunction, "FIND", errbuf, autocheck);
             goto err_ret2;
         }
@@ -1679,7 +1726,7 @@ err_ret1:
             if (words)
                 words = words->wl_next; // skip targ
 
-            if (measure_parse_when(measFind, words, errbuf) == 0) {
+            if (measure_parse_when(measFind, words, errbuf) == MEASUREMENT_FAILURE) {
                 measure_errMessage(mName, mFunction, "WHEN", errbuf, autocheck);
                 goto err_ret2;
             }
@@ -1692,11 +1739,16 @@ err_ret1:
                 goto err_ret2;
             }
 
-            measure_at(meas, measFind->m_measured);
+            if(measure_at(meas, measFind->m_measured) == MEASUREMENT_FAILURE){
+                goto err_ret2;
+            }
+
             meas->m_at = measFind->m_measured;
 
         } else {
-            measure_at(meas, meas->m_at);
+            if (measure_at(meas, meas->m_at) == MEASUREMENT_FAILURE) {
+                goto err_ret2;
+            }
         }
 
         if (isnan(meas->m_measured)) {
@@ -1730,7 +1782,7 @@ err_ret2:
         MEASUREPTR meas;
         meas = TMALLOC(struct measure, 1);
         meas->m_analysis = mAnalysis;
-        if (measure_parse_when(meas, words, errbuf) == 0) {
+        if (measure_parse_when(meas, words, errbuf) == MEASUREMENT_FAILURE) {
             measure_errMessage(mName, mFunction, "WHEN", errbuf, autocheck);
             goto err_ret3;
         }
@@ -1757,6 +1809,7 @@ err_ret3:
         tfree(mAnalysis);
         tfree(mName);
         tfree(meas->m_vec);
+        tfree(meas->m_vec2);
         tfree(meas);
 
         return ret_val;
@@ -1768,7 +1821,8 @@ err_ret3:
         MEASUREPTR meas;
         meas = TMALLOC(struct measure, 1);
         meas->m_analysis = mAnalysis;
-        if (measure_parse_trigtarg(meas, words , NULL, "trig", errbuf) == 0) {
+        if (measure_parse_trigtarg(meas, words, NULL, "trig", errbuf) ==
+                MEASUREMENT_FAILURE) {
             measure_errMessage(mName, mFunction, "TRIG", errbuf, autocheck);
             goto err_ret4;
         }
@@ -1812,7 +1866,8 @@ err_ret4:
 
         meas->m_analysis = mAnalysis;
 
-        if (measure_parse_trigtarg(meas, words , NULL, "trig", errbuf) == 0) {
+        if (measure_parse_trigtarg(meas, words, NULL, "trig", errbuf) ==
+                MEASUREMENT_FAILURE) {
             measure_errMessage(mName, mFunction, "TRIG", errbuf, autocheck);
             goto err_ret5;
         }
@@ -1855,7 +1910,8 @@ err_ret5:
         MEASUREPTR measTrig;
         measTrig = TMALLOC(struct measure, 1);
         measTrig->m_analysis = mAnalysis;
-        if (measure_parse_trigtarg(measTrig, words , NULL, "trig", errbuf) == 0) {
+        if (measure_parse_trigtarg(measTrig, words, NULL, "trig", errbuf) ==
+                MEASUREMENT_FAILURE) {
             measure_errMessage(mName, mFunction, "TRIG", errbuf, autocheck);
             goto err_ret6;
         }
@@ -1906,7 +1962,8 @@ err_ret6:
         MEASUREPTR measTrig;
         measTrig = TMALLOC(struct measure, 1);
         measTrig->m_analysis = mAnalysis;
-        if (measure_parse_trigtarg(measTrig, words , NULL, "trig", errbuf) == 0) {
+        if (measure_parse_trigtarg(measTrig, words, NULL, "trig", errbuf) ==
+                MEASUREMENT_FAILURE) {
             measure_errMessage(mName, mFunction, "TRIG", errbuf, autocheck);
             goto err_ret7;
         }

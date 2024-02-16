@@ -141,7 +141,7 @@ GENmodel *inMod)
         case BSIM3_MOD_NGATE:
             mod->BSIM3ngate = value->rValue;
             mod->BSIM3ngateGiven = TRUE;
-            if (mod->BSIM3ngate > 1.0e23)
+            if (mod->BSIM3ngate > 1.000001e24)
                 mod->BSIM3ngate *= 1.0e-6;
             break;
         case BSIM3_MOD_GAMMA1:
@@ -1743,6 +1743,26 @@ GENmodel *inMod)
         case BSIM3_MOD_VBD_MAX:
             mod->BSIM3vbdMax = value->rValue;
             mod->BSIM3vbdMaxGiven = TRUE;
+            break;
+        case BSIM3_MOD_VGSR_MAX:
+            mod->BSIM3vgsrMax = value->rValue;
+            mod->BSIM3vgsrMaxGiven = TRUE;
+            break;
+        case BSIM3_MOD_VGDR_MAX:
+            mod->BSIM3vgdrMax = value->rValue;
+            mod->BSIM3vgdrMaxGiven = TRUE;
+            break;
+        case BSIM3_MOD_VGBR_MAX:
+            mod->BSIM3vgbrMax = value->rValue;
+            mod->BSIM3vgbrMaxGiven = TRUE;
+            break;
+        case BSIM3_MOD_VBSR_MAX:
+            mod->BSIM3vbsrMax = value->rValue;
+            mod->BSIM3vbsrMaxGiven = TRUE;
+            break;
+        case BSIM3_MOD_VBDR_MAX:
+            mod->BSIM3vbdrMax = value->rValue;
+            mod->BSIM3vbdrMaxGiven = TRUE;
             break;
 
         case  BSIM3_MOD_NMOS  :

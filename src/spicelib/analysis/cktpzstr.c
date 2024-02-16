@@ -120,14 +120,13 @@ CKTpzFindZeros(CKTcircuit *ckt, PZtrial **rootinfo, int *rootcount)
     PZtrial *neighborhood[3];
     int    strat;
     int    error;
-    char   ebuf[513];
 
     NIpzK = 0.0;
     NIpzK_mag = 0;
     High_Guess = -1.0;
     Low_Guess = 1.0;
-    ZeroTrial = 0;
-    Trials = 0;
+    ZeroTrial = NULL;
+    Trials = NULL;
     NZeros = 0;
     NFlat = 0;
     Max_Zeros = SMPmatSize(ckt->CKTmatrix);
@@ -184,10 +183,7 @@ CKTpzFindZeros(CKTcircuit *ckt, PZtrial **rootinfo, int *rootcount)
 	}
 
 	if (SPfrontEnd->IFpauseTest()) {
-	    sprintf(ebuf,
-		"Pole-Zero analysis interrupted; %d trials, %d roots\n",
-		Seq_Num, NZeros); 
-	    SPfrontEnd->IFerror (ERR_WARNING, ebuf, 0);
+	    SPfrontEnd->IFerrorf (ERR_WARNING, "Pole-Zero analysis interrupted; %d trials, %d roots\n", Seq_Num, NZeros);
 	    error = E_PAUSE;
 	    break;
 	}
@@ -218,17 +214,11 @@ CKTpzFindZeros(CKTcircuit *ckt, PZtrial **rootinfo, int *rootcount)
     *rootcount = NZeros;
 
     if (Aberr_Num > 2) {
-	sprintf(ebuf,
-    "Pole-zero converging to numerical aberrations; giving up after %d trials",
-	    Seq_Num);
-	SPfrontEnd->IFerror (ERR_WARNING, ebuf, 0);
+	SPfrontEnd->IFerrorf (ERR_WARNING, "Pole-zero converging to numerical aberrations; giving up after %d trials", Seq_Num);
     }
 
     if (NIter >= NITER_LIM) {
-	sprintf(ebuf,
-	    "Pole-zero iteration limit reached; giving up after %d trials",
-	    Seq_Num);
-	SPfrontEnd->IFerror (ERR_WARNING, ebuf, 0);
+	SPfrontEnd->IFerrorf (ERR_WARNING, "Pole-zero iteration limit reached; giving up after %d trials", Seq_Num);
     }
 
     return error;
@@ -244,7 +234,7 @@ PZeval(int strat, PZtrial **set, PZtrial **new_trial_p)
     int		error;
     PZtrial	*new_trial;
 
-    new_trial = NEW(PZtrial);
+    new_trial = TMALLOC(PZtrial, 1);
     new_trial->multiplicity = 0;
     new_trial->count = 0;
     new_trial->seq_num = Seq_Num++;
@@ -264,9 +254,9 @@ PZeval(int strat, PZtrial **set, PZtrial **new_trial_p)
 	    else
 		Guess_Param = -1.0;
 	}
-	if (Guess_Param > High_Guess)
+	if (High_Guess < Guess_Param)
 	    High_Guess = Guess_Param;
-	if (Guess_Param < Low_Guess)
+	if (Low_Guess > Guess_Param)
 	    Low_Guess = Guess_Param;
 	new_trial->s.real = Guess_Param;
 	if (set[1])

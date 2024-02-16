@@ -14,6 +14,7 @@ Author: 1987 Wayne A. Christopher, U. C. Berkeley CAD Group
 #include "ngspice/ifsim.h"
 #include "ngspice/inpptree.h"
 #include "inpxx.h"
+#include "ngspice/compatmode.h"
 
 /* XXX These should be in math.h */
 
@@ -25,7 +26,7 @@ double PTfudge_factor;
 double
 PTabs(double arg)
 {
-    return arg >= 0.0 ? arg : -arg;
+    return fabs(arg);
 }
 
 double
@@ -69,19 +70,16 @@ PTdivide(double arg1, double arg2)
 double
 PTpower(double arg1, double arg2)
 {
-    if (arg1 < 0.0) {
-        if (fabs(arg2 - ((int) arg2)) / (arg2 + 0.001) < 0.000001) {
-            arg2 = (int) arg2;
-        } else {
-            arg1 = -arg1;
-        }
-    }
-    return (pow(arg1, arg2));
+    return pow(fabs(arg1), arg2);
 }
 
 double
 PTpwr(double arg1, double arg2)
 {
+    /* if PSPICE device is evaluated */
+    if (arg1 == 0.0 && arg2 < 0.0 && newcompat.ps)
+        arg1 += PTfudge_factor;
+
     if (arg1 < 0.0)
         return (-pow(-arg1, arg2));
     else
@@ -217,14 +215,18 @@ PTcosh(double arg)
     return (cosh(arg));
 }
 
+/* Limit the exp: If arg > EXPARGMAX (arbitrarily selected to 14), continue with linear output */
 double
 PTexp(double arg)
 {
-    return (exp(arg));
+    if (arg > EXPARGMAX)
+        return EXPMAX * (arg - EXPARGMAX + 1.);
+    else
+        return (exp(arg));
 }
 
 double
-PTln(double arg)
+PTlog(double arg)
 {
     if (arg < 0.0)
         return (HUGE);
@@ -232,7 +234,7 @@ PTln(double arg)
 }
 
 double
-PTlog(double arg)
+PTlog10(double arg)
 {
     if (arg < 0.0)
         return (HUGE);
@@ -339,3 +341,12 @@ PTfloor(double arg1)
     return (floor(arg1));
 }
 
+double
+PTnint(double arg1)
+{
+    /* round to "nearest integer",
+     *   round half-integers to the nearest even integer
+     *   rely on default rounding mode of IEEE 754 to do so
+     */
+    return nearbyint(arg1);
+}

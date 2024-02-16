@@ -29,10 +29,18 @@ Makefile.in
 /libtool
 /ltmain.sh
 /aclocal.m4
-/m4
+/m4/libtool.m4
+/m4/ltoptions.m4
+/m4/ltsugar.m4
+/m4/ltversion.m4
+/m4/lt~obsolete.m4
 /missing
 /ylwrap
 /ar-lib
+/ngspice.pc
+
+/src/frontend/parse-bison.*
+/src/spicelib/parser/inpptree-parser.*
 
 /src/include/ngspice/config.h.in
 /src/include/ngspice/config.h
@@ -43,6 +51,10 @@ Makefile.in
 /src/maths/cmaths/test_cx_mag
 /src/maths/cmaths/test_cx_ph
 
+/src/spicelib/devices/adms/*/*.*
+!/src/spicelib/devices/adms/admst/*.*
+!/src/spicelib/devices/adms/*/admsva/*.*
+
 /src/ngmakeidx
 /src/ngmultidec
 /src/ngnutmeg
@@ -52,9 +64,29 @@ Makefile.in
 /src/ngspice.idx
 /src/spinit
 
-!/xgraph/Makefile.in
-
 /release*
 /debug*
 
 /visualc-tcl*
+
+# Swap files for Vim
+**/*.swp
+**/*.swo
+
+# Patches
+**/*.patch
+
+# Visual Studio user options files
+**/*.vcxproj.user
+.vscode/
+
+src/frontend/parse-bison.c
+src/frontend/parse-bison.h
+src/spicelib/parser/inpptree-parser.c
+src/spicelib/parser/inpptree-parser.h
+# Visual Studio Code user options files
+.vscode/
+
+test_cases/diode/__pycache__/*
+test_cases/diode/test_osdi/*
+test_cases/diode/test_built_in/*

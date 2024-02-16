@@ -1,6 +1,7 @@
 %option prefix="mod_yy"
 %option yylineno
 %option noyywrap
+%option nounput
 %{
 
 /*============================================================================
@@ -90,6 +91,7 @@ Z	[0-9A-Za-z_]
 
 ARGS			{return TOK_ARGS;}
 INIT			{return TOK_INIT;}
+CALLBACK		{return TOK_CALLBACK;}
 ANALYSIS		{return TOK_ANALYSIS;}
 NEW_TIMEPOINT		{return TOK_NEW_TIMEPOINT;}
 CALL_TYPE		{return TOK_CALL_TYPE;}

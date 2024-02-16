@@ -36,7 +36,7 @@ MOS3temp(GENmodel *inModel, CKTcircuit *ckt)
     double gmanew,gmaold;
     double ni_temp, nifact;
     /* loop through all the mosfet models */
-    for( ; model != NULL; model = model->MOS3nextModel) {
+    for( ; model != NULL; model = MOS3nextModel(model)) {
         
         if(!model->MOS3tnomGiven) {
             model->MOS3tnom = ckt->CKTnomTemp;
@@ -54,8 +54,8 @@ MOS3temp(GENmodel *inModel, CKTcircuit *ckt)
         ni_temp=1.45e16*nifact;
 
         if (model->MOS3phi <= 0.0) {
-            SPfrontEnd->IFerror (ERR_FATAL,
-               "%s: Phi is not positive.", &model->MOS3modName);
+            SPfrontEnd->IFerrorf (ERR_FATAL,
+               "%s: Phi is not positive.", model->MOS3modName);
             return(E_BADPARM);
         }
 
@@ -104,8 +104,8 @@ MOS3temp(GENmodel *inModel, CKTcircuit *ckt)
                 model->MOS3coeffDepLayWidth = sqrt(model->MOS3alpha);
             } else {
                 model->MOS3substrateDoping = 0;
-                SPfrontEnd->IFerror (ERR_FATAL,
-                        "%s: Nsub < Ni ",&(model->MOS3modName));
+                SPfrontEnd->IFerrorf (ERR_FATAL,
+                        "%s: Nsub < Ni ", model->MOS3modName);
                 return(E_BADPARM);
             }
         }
@@ -115,8 +115,8 @@ MOS3temp(GENmodel *inModel, CKTcircuit *ckt)
 
     
         /* loop through all instances of the model */
-        for(here = model->MOS3instances; here!= NULL; 
-                here = here->MOS3nextInstance) {
+        for(here = MOS3instances(model); here!= NULL; 
+                here = MOS3nextInstance(here)) {
 
             double czbd;    /* zero voltage bulk-drain capacitance */
             double czbdsw;  /* zero voltage bulk-drain sidewall capacitance */
@@ -197,17 +197,17 @@ MOS3temp(GENmodel *inModel, CKTcircuit *ckt)
 
             if(here->MOS3l - 2 * model->MOS3latDiff +
                                  model->MOS3lengthAdjust <= 0) {
-                SPfrontEnd->IFerror (ERR_FATAL,
+                SPfrontEnd->IFerrorf (ERR_FATAL,
                         "%s: effective channel length less than zero",
-                        &(here->MOS3name));
+                        here->MOS3name);
                 return(E_PARMVAL);
             }
 
             if(here->MOS3w - 2 * model->MOS3widthNarrow +
                                  model->MOS3widthAdjust <= 0) {
-                SPfrontEnd->IFerror (ERR_FATAL,
+                SPfrontEnd->IFerrorf (ERR_FATAL,
                         "%s: effective channel width less than zero",
-                        &(here->MOS3name));
+                        here->MOS3name);
                 return(E_PARMVAL);
             }
 

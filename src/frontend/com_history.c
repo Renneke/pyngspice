@@ -28,6 +28,7 @@ static wordlist *hpattern(char *buf);
 static wordlist *hprefix(char *buf);
 static wordlist *getevent(int num);
 #if !defined(HAVE_GNUREADLINE) && !defined(HAVE_BSDEDITLINE)
+static void cp_hprint(int eventhi, int eventlo, bool rev);
 static void freehist(int num);
 #endif
 static char *dohs(char *pat, char *str);
@@ -56,16 +57,15 @@ wordlist *
 cp_histsubst(wordlist *wlist)
 {
     wordlist *nwl, *w, *n;
-    char buf[BSIZE_SP], *s, *b;
+    char *s, *b;
 
     /* Replace ^old^new with !:s^old^new. */
 
     cp_didhsubst = FALSE;
     if (*wlist->wl_word == cp_hat) {
-        (void) sprintf(buf, "%c%c:s%s", cp_bang, cp_bang,
-                       wlist->wl_word);
-        tfree(wlist->wl_word);
-        wlist->wl_word = copy(buf);
+        char *x = wlist->wl_word;
+        wlist->wl_word = tprintf("%c%c:s%s", cp_bang, cp_bang, wlist->wl_word);
+        tfree(x);
     }
 
     for (w = wlist; w; w = w->wl_next) {
@@ -78,10 +78,10 @@ cp_histsubst(wordlist *wlist)
                     wlist->wl_word = NULL;
                     return (wlist);
                 }
-                if (b < s) {
-                    (void) sprintf(buf, "%.*s%s", (int)(s-b), b, n->wl_word);
-                    tfree(n->wl_word);
-                    n->wl_word = copy(buf);
+                if (s > b) {
+                    char *x = n->wl_word;
+                    n->wl_word = tprintf("%.*s%s", (int)(s-b), b, n->wl_word);
+                    tfree(x);
                 }
                 nwl = wl_splice(w, n);
                 if (wlist == w)
@@ -121,7 +121,7 @@ dohsubst(char *string)
             wl = getevent(cp_event - scannum(++string));
             if (!wl)
                 return (NULL);
-            while (isdigit(*string))
+            while (isdigit_c(*string))
                 string++;
             break;
 
@@ -142,11 +142,11 @@ dohsubst(char *string)
             return (wl);
 
         default:
-            if (isdigit(*string)) {
+            if (isdigit_c(*string)) {
                 wl = getevent(scannum(string));
                 if (!wl)
                     return (NULL);
-                while (isdigit(*string))
+                while (isdigit_c(*string))
                     string++;
             } else {
                 (void) strcpy(buf, string);
@@ -182,11 +182,12 @@ dohsubst(char *string)
         return (NULL);
 
     if (*string) {
+        char *x;
         for (wl = nwl; wl->wl_next; wl = wl->wl_next)
             ;
-        (void) sprintf(buf, "%s%s", wl->wl_word, string);
-        tfree(wl->wl_word);
-        wl->wl_word = copy(buf);
+        x = wl->wl_word;
+        wl->wl_word = tprintf("%s%s", wl->wl_word, string);
+        tfree(x);
     }
 
     return (nwl);
@@ -266,7 +267,7 @@ anothermod:
             (*string)++;
         break;
     default:
-        if (!isdigit(**string)) {
+        if (!isdigit_c(**string)) {
             fprintf(cp_err, "Error: %s: bad modifier.\n",
                     *string);
             return (NULL);
@@ -278,16 +279,16 @@ anothermod:
             return (NULL);
         }
         eventhi = eventlo = i;
-        while (isdigit(**string))
+        while (isdigit_c(**string))
             (*string)++;
         if (**string == '*')
             eventhi = numwords - 1;
         if (**string == '-') {
-            if (!isdigit(*(*string + 1))) {
+            if (!isdigit_c(*(*string + 1))) {
                 eventhi = numwords - 1;
             } else {
                 eventhi = scannum(++*string);
-                while (isdigit(**string))
+                while (isdigit_c(**string))
                     (*string)++;
             }
         }
@@ -364,10 +365,10 @@ cp_addhistent(int event, wordlist *wlist)
         /* MW. the begging - initialize histlength */
         histlength = 1;
 
-        cp_lastone = histlist = alloc(struct histent);
+        cp_lastone = histlist = TMALLOC(struct histent, 1);
         cp_lastone->hi_prev = NULL;
     } else {
-        cp_lastone->hi_next = alloc(struct histent);
+        cp_lastone->hi_next = TMALLOC(struct histent, 1);
         cp_lastone->hi_next->hi_prev = cp_lastone;
         cp_lastone = cp_lastone->hi_next;
     }
@@ -405,11 +406,13 @@ getevent(int num)
 }
 
 
+#if !defined(HAVE_GNUREADLINE) && !defined(HAVE_BSDEDITLINE)
+
 /* Print out history between eventhi and eventlo.
  * This doesn't remember quoting, so 'hodedo' prints as hodedo.
  */
 
-void
+static void
 cp_hprint(int eventhi, int eventlo, bool rev)
 {
     struct histent *hi;
@@ -439,8 +442,6 @@ cp_hprint(int eventhi, int eventlo, bool rev)
     }
 }
 
-
-#if !defined(HAVE_GNUREADLINE) && !defined(HAVE_BSDEDITLINE)
 
 /* This just gets rid of the first num entries on the history list, and
  * decrements histlength.

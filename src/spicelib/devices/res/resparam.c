@@ -21,12 +21,14 @@ RESparam(int param, IFvalue *value, GENinstance *inst, IFvalue *select)
 
     NG_IGNORE(select);
 
-    if (!cp_getvar("scale", CP_REAL, &scale))
+    if (!cp_getvar("scale", CP_REAL, &scale, 0))
         scale = 1;
 
     switch(param) {
     case RES_TEMP:
         here->REStemp = value->rValue + CONSTCtoK;
+        if (here->REStemp < 1e-6)
+            here->REStemp = 0;
         here->REStempGiven = TRUE;
         break;
     case RES_DTEMP:
@@ -70,6 +72,10 @@ RESparam(int param, IFvalue *value, GENinstance *inst, IFvalue *select)
         here->REStc2 = value->rValue;
         here->REStc2Given = TRUE;
         break;
+    case RES_TCE:
+        here->REStce = value->rValue;
+        here->REStceGiven = TRUE;
+        break;
     case RES_NOISY:
         here->RESnoisy = value->iValue;
         here->RESnoisyGiven = TRUE;
@@ -81,5 +87,6 @@ RESparam(int param, IFvalue *value, GENinstance *inst, IFvalue *select)
     default:
         return(E_BADPARM);
     }
+    RESupdate_conduct(here, FALSE);
     return(OK);
 }

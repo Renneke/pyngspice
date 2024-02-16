@@ -13,11 +13,12 @@ Remarks:  This code is based on a version written by Serban Popescu which
 #include "ngspice/inpmacs.h"
 #include "ngspice/fteext.h"
 #include "inpxx.h"
+#include "ngspice/stringskip.h"
 
 /* undefine to add tracing to this file */
 /* #define TRACE */
 
-void INP2R(CKTcircuit *ckt, INPtables * tab, card * current)
+void INP2R(CKTcircuit *ckt, INPtables * tab, struct card *current)
 {
 /* parse a resistor card */
 /* Rname <node> <node> [<val>][<mname>][w=<val>][l=<val>][ac=<val>] */
@@ -56,7 +57,7 @@ void INP2R(CKTcircuit *ckt, INPtables * tab, card * current)
         }
     }
     line = current->line;
-    INPgetTok(&line, &name, 1);			/* Rname */
+    INPgetNetTok(&line, &name, 1);			/* Rname */
     INPinsert(&name, tab);
     INPgetNetTok(&line, &nname1, 1);		/* <node> */
     INPtermInsert(ckt, &nname1, tab, &node1);
@@ -82,40 +83,30 @@ void INP2R(CKTcircuit *ckt, INPtables * tab, card * current)
         char *p;
         size_t left_length;
 
-        s += 2;
-
-        /* skip any white space */
-        while(isspace(*s))
-            s++;
+        s = skip_ws(s + 2);
 
         /* reject if not '=' */
         if(*s != '=')
             continue;
 
-        s++;
-
-        /* skip any white space */
-        while(isspace(*s))
-            s++;
+        s = skip_ws(s + 1);
 
         /* if we now have +, - or a decimal digit then assume we have a number,
            otherwise reject */
-        if((*s != '+') && (*s != '-') && !isdigit(*s))
+        if((*s != '+') && (*s != '-') && !isdigit_c(*s))
             continue;
 
         /* look for next white space or null */
-        while(*s && !isspace(*s))
-            s++;
+        s = skip_non_ws(s);
 
         left_length = (size_t) (s - current->line);
 
         /* skip any additional white space */
-        while(isspace(*s))
-            s++;
+        s = skip_ws(s);
 
         /* if we now have +, - or a decimal digit then assume we have the
             second number, otherwise reject */
-        if((*s != '+') && (*s != '-') && !isdigit(*s))
+        if((*s != '+') && (*s != '-') && !isdigit_c(*s))
             continue;
 
         /* if we get this far we have met all are criterea,
@@ -146,7 +137,7 @@ void INP2R(CKTcircuit *ckt, INPtables * tab, card * current)
 
     saveline = line;		/* save then old pointer */
 
-    INPgetTok(&line, &model, 1);
+    INPgetNetTok(&line, &model, 1);
 
     if (*model && (strcmp(model, "r") != 0)) {
       /* token isn't null */
@@ -156,10 +147,13 @@ void INP2R(CKTcircuit *ckt, INPtables * tab, card * current)
           printf("In INP2R, Valid R Model: %s\n", model);
 #endif
           INPinsert(&model, tab);
-          thismodel = NULL;
           current->error = INPgetMod(ckt, model, &thismodel, tab);
           if (thismodel != NULL) {
-            if (mytype != thismodel->INPmodType) {
+            if ((INPtypelook("Resistor") != thismodel->INPmodType)
+#ifdef ADMS
+               && (INPtypelook("r2_cmc") != thismodel->INPmodType)
+#endif
+            ) {
                 LITERR("incorrect model type for resistor");
                 return;
             }

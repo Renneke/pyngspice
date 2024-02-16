@@ -38,9 +38,7 @@
 #include <stdio.h>
 
 #undef  ABORT
-#undef  MALLOC
 #undef  FREE
-#undef  REALLOC
 
 
 
@@ -80,7 +78,12 @@
 #define  SQR(a)             ((a)*(a))
 
 /* Macro procedure that swaps two entities. */
-#define  SWAP(type, a, b)   {type swapx; swapx = a; a = b; b = swapx;}
+#define SWAP(type, a, b)                        \
+    do {                                        \
+        type SWAP_macro_local = a;              \
+        a = b;                                  \
+        b = SWAP_macro_local;                   \
+    } while(0)
 
 
 
@@ -145,7 +148,7 @@ typedef  struct
 #define  CMPLX_INF_NORM(a)      (MAX (ABS((a).Real),ABS((a).Imag)))
 
 /* Macro function that returns the magnitude (L-2 norm) of a complex number. */
-#define  CMPLX_2_NORM(a)        (sqrt((a).Real*(a).Real + (a).Imag*(a).Imag))
+#define  CMPLX_2_NORM(a)        (hypot((a).Real, (a).Imag))
 
 /* Macro function that performs complex addition. */
 #define  CMPLX_ADD(to,from_a,from_b)            \
@@ -363,8 +366,8 @@ typedef  struct
 /* Allocation */
 
 extern void * tmalloc(size_t);
-extern void   txfree(void *);
-extern void * trealloc(void *, size_t);
+extern void   txfree(const void *);
+extern void * trealloc(const void *, size_t);
 
 #define SP_MALLOC(type,number)  (type *) tmalloc((size_t)(number) * sizeof(type))
 #define SP_REALLOC(ptr,type,number) \
@@ -372,6 +375,7 @@ extern void * trealloc(void *, size_t);
 #define SP_FREE(ptr) { if ((ptr) != NULL) txfree(ptr); (ptr) = NULL; }
 
 
+#include "ngspice/config.h"
 
 /* A new calloc */
 #ifndef HAVE_LIBGC
@@ -382,6 +386,11 @@ extern void * trealloc(void *, size_t);
 #define SP_CALLOC(ptr,type,number)                           \
 { ptr = (type *) tmalloc((size_t)(number) * sizeof(type));   \
 }
+#include <gc/gc.h>
+#define tmalloc(m)      GC_malloc(m)
+#define trealloc(m, n)  GC_realloc((m), (n))
+#define tfree(m)
+#define txfree(m)
 #endif
 
 #include "ngspice/defines.h"

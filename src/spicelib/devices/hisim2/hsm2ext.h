@@ -1,14 +1,14 @@
 /***********************************************************************
 
  HiSIM (Hiroshima University STARC IGFET Model)
- Copyright (C) 2012 Hiroshima University & STARC
+ Copyright (C) 2014 Hiroshima University & STARC
 
  MODEL NAME : HiSIM
- ( VERSION : 2  SUBVERSION : 7  REVISION : 0 ) Beta
+ ( VERSION : 2  SUBVERSION : 8  REVISION : 0 )
  
  FILE : hsm2ext.h
 
- Date : 2012.10.25
+ Date : 2014.6.5
 
  released by 
                 Hiroshima University &
@@ -18,12 +18,10 @@
 extern int HSM2acLoad(GENmodel *,CKTcircuit*);
 extern int HSM2ask(CKTcircuit *,GENinstance*,int,IFvalue*,IFvalue*);
 extern int HSM2convTest(GENmodel *,CKTcircuit*);
-extern int HSM2delete(GENmodel*,IFuid,GENinstance**);
-extern void HSM2destroy(GENmodel**);
 extern int HSM2getic(GENmodel*,CKTcircuit*);
 extern int HSM2load(GENmodel*,CKTcircuit*);
 extern int HSM2mAsk(CKTcircuit*,GENmodel *,int, IFvalue*);
-extern int HSM2mDelete(GENmodel**,IFuid,GENmodel*);
+extern int HSM2mDelete(GENmodel*);
 extern int HSM2mParam(int,IFvalue*,GENmodel*);
 extern void HSM2mosCap(CKTcircuit*, double, double, double, double*,
         double, double, double, double, double, double,

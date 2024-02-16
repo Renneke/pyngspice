@@ -4,18 +4,19 @@ Author:	1991 David A. Gates, U. C. Berkeley CAD Group
 Modifed: 2001 Paolo Nenzi
 **********/
 
-#include "ngspice/ngspice.h"
+#include "ngspice/carddefs.h"
+#include "ngspice/cidersupt.h"
 #include "ngspice/cktdefs.h"
-#include "ngspice/numenum.h"
+#include "ngspice/ciderinp.h"
+#include "ngspice/cpextern.h"
 #include "ngspice/dopdefs.h"
 #include "ngspice/meshext.h"
+#include "ngspice/ngspice.h"
+#include "ngspice/numenum.h"
 #include "ngspice/profile.h"
 #include "ngspice/gendev.h"
 #include "ngspice/sperror.h"
 #include "ngspice/suffix.h"
-#include "ngspice/cidersupt.h"
-#include "ngspice/carddefs.h"
-#include "ngspice/ciderinp.h"
 
 
 /*
@@ -32,7 +33,6 @@ DOPcheck(DOPcard *cardList, MESHcoord *xMeshList, MESHcoord *yMeshList)
   DOPcard *card;
   int cardNum = 0;
   int error = OK;
-  char ebuf[512];		/* error message buffer */
 
   for ( card = cardList; card != NULL; card = card->DOPnextCard ) {
     cardNum++;
@@ -41,81 +41,54 @@ DOPcheck(DOPcard *cardList, MESHcoord *xMeshList, MESHcoord *yMeshList)
       card->DOPdomains = NULL;
     }
     if (!card->DOPprofileTypeGiven) {
-      sprintf( ebuf,
-	  "doping card %d does not specify profile type",
-	  cardNum );
-      SPfrontEnd->IFerror( ERR_WARNING, ebuf, NULL );
+      SPfrontEnd->IFerrorf( ERR_WARNING, "doping card %d does not specify profile type", cardNum );
       error = E_PRIVATE;
     } else switch (card->DOPprofileType) {
       case DOP_UNIF:
 	if (!card->DOPconcGiven) {
-	  sprintf( ebuf,
-	      "doping card %d needs conc of uniform distribution",
-	      cardNum );
-	  SPfrontEnd->IFerror( ERR_WARNING, ebuf, NULL );
+	  SPfrontEnd->IFerrorf( ERR_WARNING, "doping card %d needs conc of uniform distribution", cardNum );
 	  error = E_PRIVATE;
 	}
 	break;
       case DOP_LINEAR:
 	if (!card->DOPconcGiven) {
-	  sprintf( ebuf,
-	      "doping card %d needs peak conc of linear distribution",
-	      cardNum );
-	  SPfrontEnd->IFerror( ERR_WARNING, ebuf, NULL );
+	  SPfrontEnd->IFerrorf( ERR_WARNING, "doping card %d needs peak conc of linear distribution", cardNum );
 	  error = E_PRIVATE;
 	}
 	break;
       case DOP_GAUSS:
 	if (!card->DOPconcGiven) {
-	  sprintf( ebuf,
-	      "doping card %d needs peak conc of gaussian distribution",
-	      cardNum );
-	  SPfrontEnd->IFerror( ERR_WARNING, ebuf, NULL );
+	  SPfrontEnd->IFerrorf( ERR_WARNING, "doping card %d needs peak conc of gaussian distribution", cardNum );
 	  error = E_PRIVATE;
 	}
 	break;
       case DOP_ERFC:
 	if (!card->DOPconcGiven) {
-	  sprintf( ebuf,
-	      "doping card %d needs peak conc of error-function distribution",
-	      cardNum );
-	  SPfrontEnd->IFerror( ERR_WARNING, ebuf, NULL );
+	  SPfrontEnd->IFerrorf( ERR_WARNING, "doping card %d needs peak conc of error-function distribution", cardNum );
 	  error = E_PRIVATE;
 	}
 	break;
       case DOP_EXP:
 	if (!card->DOPconcGiven) {
-	  sprintf( ebuf,
-	      "doping card %d needs peak conc of exponential distribution",
-	      cardNum );
-	  SPfrontEnd->IFerror( ERR_WARNING, ebuf, NULL );
+	  SPfrontEnd->IFerrorf( ERR_WARNING, "doping card %d needs peak conc of exponential distribution", cardNum );
 	  error = E_PRIVATE;
 	}
 	break;
       case DOP_SUPREM3:
       case DOP_SUPASCII:
 	if (!card->DOPinFileGiven) {
-	  sprintf( ebuf,
-	      "doping card %d needs input-file name of suprem3 data",
-	      cardNum );
-	  SPfrontEnd->IFerror( ERR_WARNING, ebuf, NULL );
+	  SPfrontEnd->IFerrorf( ERR_WARNING, "doping card %d needs input-file name of suprem3 data", cardNum );
 	  error = E_PRIVATE;
 	}
 	break;
       case DOP_ASCII:
 	if (!card->DOPinFileGiven) {
-	  sprintf( ebuf,
-	      "doping card %d needs input-file name of ascii data",
-	      cardNum );
-	  SPfrontEnd->IFerror( ERR_WARNING, ebuf, NULL );
+	  SPfrontEnd->IFerrorf( ERR_WARNING, "doping card %d needs input-file name of ascii data", cardNum );
 	  error = E_PRIVATE;
 	}
 	break;
       default:
-	sprintf( ebuf,
-	    "doping card %d has unrecognized profile type",
-	    cardNum );
-	SPfrontEnd->IFerror( ERR_FATAL, ebuf, NULL );
+	SPfrontEnd->IFerrorf( ERR_FATAL, "doping card %d has unrecognized profile type", cardNum );
 	error = E_NOTFOUND;
 	break;
     }
@@ -262,17 +235,29 @@ DOPsetup(DOPcard *cardList, DOPprofile **profileList, DOPtable **tableList,
 	break;
       case DOP_SUPREM3:
 	newProfile->type = LOOKUP;
-	readSupremData( card->DOPinFile, 0, card->DOPimpurityType, tableList );
+	if (readSupremData( card->DOPinFile, 0, card->DOPimpurityType,
+            tableList) != 0) {
+        (void) fprintf(cp_err, "Doping setup failed.\n");
+        return -1;
+    }
 	newProfile->IMPID = ++impurityId;
 	break;
       case DOP_SUPASCII:
 	newProfile->type = LOOKUP;
-	readSupremData( card->DOPinFile, 1, card->DOPimpurityType, tableList );
+    if (readSupremData( card->DOPinFile, 1, card->DOPimpurityType,
+            tableList) != 0) {
+        (void) fprintf(cp_err, "Doping setup failed.\n");
+        return -1;
+    }
 	newProfile->IMPID = ++impurityId;
 	break;
       case DOP_ASCII:
 	newProfile->type = LOOKUP;
-	readAsciiData( card->DOPinFile, card->DOPimpurityType, tableList );
+    if (readAsciiData(card->DOPinFile, card->DOPimpurityType,
+            tableList) != 0) {
+        (void) fprintf(cp_err, "Doping setup failed.\n");
+        return -1;
+    }
 	newProfile->IMPID = ++impurityId;
 	break;
       default:

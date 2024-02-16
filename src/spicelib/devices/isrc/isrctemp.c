@@ -23,11 +23,11 @@ ISRCtemp(GENmodel *inModel, CKTcircuit *ckt)
     NG_IGNORE(ckt);
 
     /*  loop through all the voltage source models */
-    for( ; model != NULL; model = model->ISRCnextModel ) {
+    for( ; model != NULL; model = ISRCnextModel(model)) {
 
         /* loop through all the instances of the model */
-        for (here = model->ISRCinstances; here != NULL ;
-                here=here->ISRCnextInstance) {
+        for (here = ISRCinstances(model); here != NULL ;
+                here=ISRCnextInstance(here)) {
 
             if(here->ISRCacGiven && !here->ISRCacMGiven) {
                 here->ISRCacMag = 1;
@@ -38,13 +38,13 @@ ISRCtemp(GENmodel *inModel, CKTcircuit *ckt)
             if(!here->ISRCdcGiven) {
                 /* no DC value - either have a transient value, or none */
                 if(here->ISRCfuncTGiven) {
-                    SPfrontEnd->IFerror (ERR_WARNING,
+                    SPfrontEnd->IFerrorf (ERR_WARNING,
                             "%s: no DC value, transient time 0 value used",
-                            &(here->ISRCname));
+                            here->ISRCname);
                 } else {
-                    SPfrontEnd->IFerror (ERR_WARNING,
+                    SPfrontEnd->IFerrorf (ERR_WARNING,
                             "%s: has no value, DC 0 assumed",
-                            &(here->ISRCname));
+                            here->ISRCname);
                 }
             }
             if(!here->ISRCmGiven)

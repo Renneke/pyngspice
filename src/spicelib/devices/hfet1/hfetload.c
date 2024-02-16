@@ -86,9 +86,9 @@ int HFETAload(GENmodel *inModel, CKTcircuit *ckt)
 
     double m;
 
-    for( ; model != NULL; model = model->HFETAnextModel ) {
-        for (here = model->HFETAinstances; here != NULL ;
-                here=here->HFETAnextInstance) {
+    for( ; model != NULL; model = HFETAnextModel(model)) {
+        for (here = HFETAinstances(model); here != NULL ;
+                here=HFETAnextInstance(here)) {
 
             vcrit = here->HFETAvcrit;
             vt  = CONSTKoverQ * here->HFETAtemp;
@@ -721,8 +721,8 @@ cgd_calc:
     dtdvds      = deltdvdse*dvdsevds+deltdvkneet*CK1*temp;
     *gmd        = -delcgdvgs*dvdsevds+delcgdtd*dtdvds;
   } else {
-    gmg = 0;
-    gmd = 0;
+    gmg = NULL;
+    gmd = NULL;
   }  
 
   if(model->HFETAgatemod != 0) {  

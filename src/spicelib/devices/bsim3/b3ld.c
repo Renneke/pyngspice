@@ -46,25 +46,26 @@ CKTcircuit *ckt)
 #ifdef USE_OMP
     int idx;
     BSIM3model *model = (BSIM3model*)inModel;
-    int good = 0;
-    BSIM3instance *here;
+    int error = 0;
     BSIM3instance **InstArray;
     InstArray = model->BSIM3InstanceArray;
 
-#pragma omp parallel for private(here)
+#pragma omp parallel for
     for (idx = 0; idx < model->BSIM3InstCount; idx++) {
-        here = InstArray[idx];
-        good = BSIM3LoadOMP(here, ckt);
+        BSIM3instance *here = InstArray[idx];
+        int local_error = BSIM3LoadOMP(here, ckt);
+        if (local_error)
+            error = local_error;
     }
 
     BSIM3LoadRhsMat(inModel, ckt);
 
-    return good;
+    return error;
 }
 
 
 int BSIM3LoadOMP(BSIM3instance *here, CKTcircuit *ckt) {
-BSIM3model *model;
+BSIM3model *model = BSIM3modPtr(here);
 #else
 BSIM3model *model = (BSIM3model*)inModel;
 BSIM3instance *here;
@@ -172,19 +173,15 @@ struct bsim3SizeDependParam *pParam;
 int ByPass, Check, ChargeComputationNeeded, error;
 /* double junk[50]; */
 
-#ifdef USE_OMP
-model = here->BSIM3modPtr;
-#endif
-
 ScalingFactor = 1.0e-9;
 ChargeComputationNeeded =
                  ((ckt->CKTmode & (MODEDCTRANCURVE | MODEAC | MODETRAN | MODEINITSMSIG)) ||
                  ((ckt->CKTmode & MODETRANOP) && (ckt->CKTmode & MODEUIC)))
                  ? 1 : 0;
 #ifndef USE_OMP
-for (; model != NULL; model = model->BSIM3nextModel)
-{    for (here = model->BSIM3instances; here != NULL;
-          here = here->BSIM3nextInstance)
+for (; model != NULL; model = BSIM3nextModel(model))
+{    for (here = BSIM3instances(model); here != NULL;
+          here = BSIM3nextInstance(here))
           {
 #endif
           Check = 1;
@@ -3129,7 +3126,7 @@ return(OK);
 #ifdef USE_OMP
 void BSIM3LoadRhsMat(GENmodel *inModel, CKTcircuit *ckt)
 {
-    unsigned int InstCount, idx;
+    int InstCount, idx;
     BSIM3instance **InstArray;
     BSIM3instance *here;
     BSIM3model *model = (BSIM3model*)inModel;
@@ -3139,6 +3136,7 @@ void BSIM3LoadRhsMat(GENmodel *inModel, CKTcircuit *ckt)
 
     for(idx = 0; idx < InstCount; idx++) {
        here = InstArray[idx];
+       model = BSIM3modPtr(here);
         /* Update b for Ax = b */
        (*(ckt->CKTrhs + here->BSIM3gNode) -= here->BSIM3rhsG);
        (*(ckt->CKTrhs + here->BSIM3bNode) -= here->BSIM3rhsB);

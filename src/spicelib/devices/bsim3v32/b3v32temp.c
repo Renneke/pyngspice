@@ -41,7 +41,7 @@ double Nvtm, SourceSatCurrent, DrainSatCurrent;
 int Size_Not_Found, error;
 
     /*  loop through all the BSIM3v32 device models */
-    for (; model != NULL; model = model->BSIM3v32nextModel)
+    for (; model != NULL; model = BSIM3v32nextModel(model))
     {    Temp = ckt->CKTtemp;
          if (model->BSIM3v32bulkJctPotential < 0.1)
          {   model->BSIM3v32bulkJctPotential = 0.1;
@@ -54,6 +54,13 @@ int Size_Not_Found, error;
          if (model->BSIM3v32GatesidewallJctPotential < 0.1)
          {   model->BSIM3v32GatesidewallJctPotential = 0.1;
              fprintf(stderr, "Given pbswg is less than 0.1. Pbswg is set to 0.1.\n");
+         }
+
+         struct bsim3v32SizeDependParam *p = model->pSizeDependParamKnot;
+         while (p) {
+             struct bsim3v32SizeDependParam *next_p = p->pNext;
+             FREE(p);
+             p = next_p;
          }
          model->pSizeDependParamKnot = NULL;
          pLastKnot = NULL;
@@ -209,8 +216,8 @@ int Size_Not_Found, error;
 
          /* loop through all the instances of the model */
                /* MCJ: Length and Width not initialized */
-         for (here = model->BSIM3v32instances; here != NULL;
-              here = here->BSIM3v32nextInstance)
+         for (here = BSIM3v32instances(model); here != NULL;
+              here = BSIM3v32nextInstance(here))
          {
               pSizeDependParamKnot = model->pSizeDependParamKnot;
               Size_Not_Found = 1;
@@ -264,45 +271,37 @@ int Size_Not_Found, error;
 
                   pParam->BSIM3v32leff = here->BSIM3v32l + model->BSIM3v32xl - 2.0 * pParam->BSIM3v32dl;
                   if (pParam->BSIM3v32leff <= 0.0)
-                  {   IFuid namarray[2];
-                      namarray[0] = model->BSIM3v32modName;
-                      namarray[1] = here->BSIM3v32name;
-                      SPfrontEnd->IFerror (ERR_FATAL,
+                  {
+                      SPfrontEnd->IFerrorf (ERR_FATAL,
                       "BSIM3v32: mosfet %s, model %s: Effective channel length <= 0",
-                       namarray);
+                       model->BSIM3v32modName, here->BSIM3v32name);
                       return(E_BADPARM);
                   }
 
                   pParam->BSIM3v32weff = here->BSIM3v32w + model->BSIM3v32xw - 2.0 * pParam->BSIM3v32dw;
                   if (pParam->BSIM3v32weff <= 0.0)
-                  {   IFuid namarray[2];
-                      namarray[0] = model->BSIM3v32modName;
-                      namarray[1] = here->BSIM3v32name;
-                      SPfrontEnd->IFerror (ERR_FATAL,
+                  {
+                      SPfrontEnd->IFerrorf (ERR_FATAL,
                       "BSIM3v32: mosfet %s, model %s: Effective channel width <= 0",
-                       namarray);
+                       model->BSIM3v32modName, here->BSIM3v32name);
                       return(E_BADPARM);
                   }
 
                   pParam->BSIM3v32leffCV = here->BSIM3v32l + model->BSIM3v32xl - 2.0 * pParam->BSIM3v32dlc;
                   if (pParam->BSIM3v32leffCV <= 0.0)
-                  {   IFuid namarray[2];
-                      namarray[0] = model->BSIM3v32modName;
-                      namarray[1] = here->BSIM3v32name;
-                      SPfrontEnd->IFerror (ERR_FATAL,
+                  {
+                      SPfrontEnd->IFerrorf (ERR_FATAL,
                       "BSIM3v32: mosfet %s, model %s: Effective channel length for C-V <= 0",
-                       namarray);
+                       model->BSIM3v32modName, here->BSIM3v32name);
                       return(E_BADPARM);
                   }
 
                   pParam->BSIM3v32weffCV = here->BSIM3v32w + model->BSIM3v32xw - 2.0 * pParam->BSIM3v32dwc;
                   if (pParam->BSIM3v32weffCV <= 0.0)
-                  {   IFuid namarray[2];
-                      namarray[0] = model->BSIM3v32modName;
-                      namarray[1] = here->BSIM3v32name;
-                      SPfrontEnd->IFerror (ERR_FATAL,
+                  {
+                      SPfrontEnd->IFerrorf (ERR_FATAL,
                       "BSIM3v32: mosfet %s, model %s: Effective channel width for C-V <= 0",
-                       namarray);
+                       model->BSIM3v32modName, here->BSIM3v32name);
                       return(E_BADPARM);
                   }
 
@@ -676,10 +675,8 @@ int Size_Not_Found, error;
                                     / pow(pParam->BSIM3v32weff * 1E6, pParam->BSIM3v32wr);
 
                   if (BSIM3v32checkModel(model, here, ckt))
-                  {   IFuid namarray[2];
-                      namarray[0] = model->BSIM3v32modName;
-                      namarray[1] = here->BSIM3v32name;
-                      SPfrontEnd->IFerror (ERR_FATAL, "Fatal error(s) detected during BSIM3v32V3.2 parameter checking for %s in model %s", namarray);
+                  {
+                      SPfrontEnd->IFerrorf (ERR_FATAL, "Fatal error(s) detected during BSIM3v32V3.2 parameter checking for %s in model %s", model->BSIM3v32modName, here->BSIM3v32name);
                       return(E_BADPARM);
                   }
 
@@ -878,11 +875,14 @@ int Size_Not_Found, error;
 
               /* process source/drain series resistance */
               /* ACM model */
+
+              double DrainResistance, SourceResistance;
+
               if (model->BSIM3v32acmMod == 0)
               {
-                  here->BSIM3v32drainConductance = model->BSIM3v32sheetResistance
+                  DrainResistance = model->BSIM3v32sheetResistance
                                                   * here->BSIM3v32drainSquares;
-                  here->BSIM3v32sourceConductance = model->BSIM3v32sheetResistance
+                  SourceResistance = model->BSIM3v32sheetResistance
                                                    * here->BSIM3v32sourceSquares;
               }
               else /* ACM > 0 */
@@ -904,21 +904,19 @@ int Size_Not_Found, error;
                   model->BSIM3v32rs,
                   model->BSIM3v32rsc,
                   here->BSIM3v32sourceSquares,
-                  &(here->BSIM3v32drainConductance),
-                  &(here->BSIM3v32sourceConductance)
+                  &DrainResistance,
+                  &SourceResistance
                   );
                   if (error)
                       return(error);
               }
-              if (here->BSIM3v32drainConductance > 0.0)
-                  here->BSIM3v32drainConductance = 1.0
-                                                / here->BSIM3v32drainConductance;
+              if (DrainResistance > 0.0)
+                  here->BSIM3v32drainConductance = 1.0 / DrainResistance;
               else
                   here->BSIM3v32drainConductance = 0.0;
 
-              if (here->BSIM3v32sourceConductance > 0.0)
-                  here->BSIM3v32sourceConductance = 1.0
-                                               / here->BSIM3v32sourceConductance;
+              if (SourceResistance > 0.0)
+                  here->BSIM3v32sourceConductance = 1.0 / SourceResistance;
               else
                   here->BSIM3v32sourceConductance = 0.0;
 

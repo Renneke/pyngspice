@@ -20,6 +20,7 @@
 #include <math.h>
 #include "ngspice/wallace.h"
 #include "ngspice/FastNorm3.h"
+#include "ngspice/randnumb.h"
 
 #define POOLSIZE 4096
 #define LPOOLSIZE 12
@@ -42,11 +43,6 @@ static unsigned n = POOLSIZE;
 static double chi1, chi2; /* chi^2 correction values */
 static unsigned int newpools;
 
-extern double drand(void);
-extern unsigned int CombLCGTausInt(void);
-extern void TausSeed(void);
-extern unsigned int CombLCGTausInt2(void);
-
 
 void
 PolarGauss(double* py1, double* py2)
@@ -66,7 +62,7 @@ PolarGauss(double* py1, double* py2)
 }
 
 
-static void
+void
 destroy_wallace(void)
 {
     tfree(pool1);
@@ -81,7 +77,7 @@ initw(void)
 {
     unsigned i;
     double totsqr, nomsqr;
-    unsigned long int coa, cob, s;
+    unsigned int coa;
 
     /* initialize the uniform generator */
     srand((unsigned int) getpid());
@@ -96,8 +92,6 @@ initw(void)
     pool2 = TMALLOC(double, n);
     addrif = TMALLOC(unsigned int, (n + NOTRANS));
     addrib = TMALLOC(unsigned int, (n + NOTRANS));
-
-    atexit(destroy_wallace);
 
     /* fill the first pool with normally distributed values */
     PolarGauss(&pool1[0], &pool1[1]);
@@ -137,18 +131,14 @@ initw(void)
     variate_used = n - 2;
 
     /* generate random reading addresses using a LCG */
-    s = 0;
     coa = 241;
-    cob = 59;
     for (i = 0; i < (n + NOTRANS); i++) {
         // addrif[i] = s = (s * coa + cob) % (n);
         coa = CombLCGTausInt();
         addrif[i] = coa >> (32 - LPOOLSIZE);
         // printf ("Random add:\t%ld\n" , s);
     }
-    s = 0;
     coa = 193;
-    cob = 15;
     for (i = 0; i < (n + NOTRANS); i++) {
         // addrib[i] = s = (s * coa + cob) % (n);
         coa = CombLCGTausInt();
@@ -197,10 +187,8 @@ reran1:
     for (i = 2; i >= 0; i--)
         for (j = 0; j <= i; j++)
             if (top[j] < top[j+1]) {
-                k = top[j];  top[j] = top[j+1];
-                top[j+1] = k;
-                k = ord[j];  ord[j] = ord[j+1];
-                ord[j+1] = k;
+                SWAP(int, top[j], top[j+1]);
+                SWAP(int, ord[j], ord[j+1]);
             }
 
     /* Ensure all different  */

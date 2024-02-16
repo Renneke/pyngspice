@@ -216,7 +216,6 @@ void call_python_eval(Mif_Private_t *mif_private, PyObject* pModule, char* pytho
         Py_XDECREF(pArgs);
 
         if (pValue != NULL) {
-            printf("Result of call: %ld\n", PyLong_AsLong(pValue));
             Py_XDECREF(pValue);
         } else {
             PyErr_Print();
@@ -232,12 +231,18 @@ PyObject* init_pymodule(char* python_module, char* python_function)
 {
     PyObject* pName = PyUnicode_DecodeFSDefault(python_module);
     PyObject* pModule = PyImport_Import(pName);
+    if(pModule == NULL)
+    {
+        return NULL;
+    }
     Py_XDECREF(pName);
 
     PyObject* ptr = PyCFunction_New(&my_module_methods[0], pModule);
     PyModule_AddObject(pModule, "example_cpp_wrapper", ptr);
+
     ptr = PyCFunction_New(&my_module_methods[1], pModule);
     PyModule_AddObject(pModule, "set_output", ptr);
+
     ptr = PyCFunction_New(&my_module_methods[2], pModule);
     PyModule_AddObject(pModule, "get_input", ptr);
 
@@ -245,22 +250,56 @@ PyObject* init_pymodule(char* python_module, char* python_function)
     return pModule;
 }
 
+
+static void
+cm_gain_callback(ARGS, Mif_Callback_Reason_t reason)
+{
+    switch (reason) {
+        case MIF_CB_DESTROY: {
+            PyObject *loc = STATIC_VAR (pymodule);
+            if (loc) {
+                Py_XDECREF(loc);
+                STATIC_VAR (pymodule) = NULL;
+            }
+            break;
+        }
+    }
+}
+
+
 void cm_gain(ARGS)   /* structure holding parms, inputs, outputs, etc.     */
 {
-
     if (INIT == 1) {
         // Load python module
+
+        // Get the current Python path
+        PyObject* sysPath = PySys_GetObject("path");
+        // Prepend your desired directory to the Python path
+        PyObject* pathStr = PyUnicode_DecodeFSDefault(PARAM(python_path));
+        PyList_Insert(sysPath, 0, pathStr);
+
+
         STATIC_VAR(pymodule) = init_pymodule(PARAM(python_module), PARAM(python_function));
+        if(STATIC_VAR(pymodule) == NULL)
+        {
+            cm_message_send("Cannot find python module");
+            return;
+        }
+
+        CALLBACK = cm_gain_callback;
+
     }else{
         // Retrieve python module
         PyObject* module = STATIC_VAR(pymodule);
+
+        if(module == NULL)
+            return;
 
         PyObject* mif_private_wrapper = PyCapsule_New((void*)mif_private, "mif_private", NULL);
         PyModule_AddObject(module, "mif_private", mif_private_wrapper);
 
 
-        PyModule_AddObject(module, "t", PyFloat_FromDouble(mif_private->circuit.time));
-
+        PyModule_AddObject(module, "t", PyFloat_FromDouble(TIME));
         PyModule_AddObject(module, "num_in", PyLong_FromLong(PORT_SIZE(in)));
         PyModule_AddObject(module, "num_out", PyLong_FromLong(PORT_SIZE(out)));
 

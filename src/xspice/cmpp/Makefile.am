@@ -1,30 +1,61 @@
 ## Process this file with automake to produce Makefile.in
 
-BUILT_SOURCES = ifs_lex.c ifs_yacc.c ifs_yacc.h mod_lex.c mod_yacc.c mod_yacc.h
+BUILT_SOURCES = ifs_yacc.h mod_yacc.h
 
-EXTRA_DIST = ifs_lex.l mod_lex.l ifs_yacc.h mod_yacc.h .gitignore
+EXTRA_DIST = .gitignore
 
 MAINTAINERCLEANFILES = Makefile.in
 
-LEX = flex
-BISON = bison
+noinst_PROGRAMS = cmpp
 
-bin_PROGRAMS = cmpp
+AM_CPPFLAGS = -I. -I$(srcdir)
+AM_YFLAGS = -d
 
-cmpp_SOURCES = cmpp.h main.c pp_ifs.c pp_lst.c pp_mod.c read_ifs.c util.c \
-	writ_ifs.c ifs_yacc_y.h ifs_yacc.y ifs_lex.c mod_yacc_y.h mod_yacc.y \
-	mod_lex.c
+cmpp_SOURCES = main.c cmpp.h file_buffer.c file_buffer.h\
+	pp_ifs.c pp_lst.c pp_mod.c read_ifs.c writ_ifs.c util.c \
+	ifs_lex.l ifs_yacc.y ifs_yacc_y.h \
+	mod_lex.l mod_yacc.y mod_yacc_y.h
 
-mod_lex.o : mod_yacc.h
+if WINGUI
+cmpp_LDADD = -lshlwapi
+endif
+
+if WINCONSOLE
+cmpp_LDADD = -lshlwapi
+endif
+
+if SHWIN
+cmpp_LDADD = -lshlwapi
+endif
+
 mod_lex.c : mod_lex.l
-	$(LEX)  -o$@  $<
+	$(am__skiplex) $(LEXCOMPILE) -o $@ $<
 
-ifs_lex.o : ifs_yacc.h
+mod_yacc.c : mod_yacc.y
+	$(am__skipyacc) $(YACCCOMPILE) -o $@ $<
+
 ifs_lex.c : ifs_lex.l
-	$(LEX)  -o$@  $<
+	$(am__skiplex) $(LEXCOMPILE) -o $@ $<
 
-ifs_yacc.c ifs_yacc.h : ifs_yacc.y
-	$(BISON) $(BISONFLAGS) -d -o ifs_yacc.c $<
+ifs_yacc.c : ifs_yacc.y
+	$(am__skipyacc) $(YACCCOMPILE) -o $@ $<
 
-mod_yacc.c mod_yacc.h : mod_yacc.y
-	$(BISON) $(BISONFLAGS) -d -o mod_yacc.c $<
+
+if CROSS_COMPILING
+
+BUILT_SOURCES += build/cmpp$(BUILD_EXEEXT)
+CLEANFILES = build/cmpp$(BUILD_EXEEXT)
+
+BUILD_CMPP_FILES = main.c file_buffer.c \
+	pp_ifs.c pp_lst.c pp_mod.c read_ifs.c writ_ifs.c util.c \
+	ifs_lex.c ifs_yacc.c \
+	mod_lex.c mod_yacc.c
+
+build/cmpp$(BUILD_EXEEXT) : $(BUILD_CMPP_FILES)
+	$(CC_FOR_BUILD) $(CFLAGS_FOR_BUILD) \
+		$(AM_CPPFLAGS) $(LDFLAGS_FOR_BUILD) -o $@ $^ $(cmpp_LDADD)
+
+distclean-local:
+	-rm -rf build
+
+endif

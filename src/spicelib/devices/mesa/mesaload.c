@@ -81,7 +81,6 @@ MESAload(GENmodel *inModel, CKTcircuit *ckt)
 #ifndef PREDICTOR
     double xfact;
 #endif
-    double temp;
     double vted;
     double vtes;
     double vtd;
@@ -96,11 +95,11 @@ MESAload(GENmodel *inModel, CKTcircuit *ckt)
     double m;
 
     /*  loop through all the models */
-    for( ; model != NULL; model = model->MESAnextModel ) {
+    for( ; model != NULL; model = MESAnextModel(model)) {
 
         /* loop through all the instances of the model */
-        for (here = model->MESAinstances; here != NULL ;
-                here=here->MESAnextInstance) {
+        for (here = MESAinstances(model); here != NULL ;
+                here=MESAnextInstance(here)) {
 
             /*
              *  dc model parameters 
@@ -321,9 +320,7 @@ MESAload(GENmodel *inModel, CKTcircuit *ckt)
             if(inverse) {
               cdrain = -cdrain;
               vds = -vds;
-              temp = capgs;
-              capgs = capgd;
-              capgd = temp;
+              SWAP(double, capgs, capgd);
             }
             /*
              *   compute equivalent drain current source 

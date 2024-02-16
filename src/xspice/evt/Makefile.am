@@ -13,6 +13,7 @@ libevtxsp_la_SOURCES = \
 	evtop.c     \
 	evtprint.c  \
 	evtsetup.c  \
+	evtdest.c  \
 	evtbackup.c  \
 	evtdeque.c  \
 	evtinit.c  \
@@ -20,7 +21,8 @@ libevtxsp_la_SOURCES = \
 	evtnode_copy.c  \
 	evtplot.c  \
 	evtqueue.c  \
-	evttermi.c
+	evttermi.c  \
+	evtshared.c
 
 AM_CPPFLAGS = @AM_CPPFLAGS@ -I$(top_srcdir)/src/include
 AM_CFLAGS = $(STATIC)

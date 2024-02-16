@@ -318,20 +318,17 @@ doop(char what,
     if (!data)
         return (NULL);
     /* Make up the new vector. */
-    res = alloc(struct dvec);
-    ZERO(res, struct dvec);
     if (relflag || (isreal(v1) && isreal(v2) && (func != cx_comma))) {
-        res->v_flags = (v1->v_flags | v2->v_flags |
-                        VF_REAL) & ~ VF_COMPLEX;
-        res->v_realdata = (double *) data;
+        res = dvec_alloc(mkcname(what, v1->v_name, v2->v_name),
+                         SV_NOTYPE,
+                         (v1->v_flags | v2->v_flags | VF_REAL) & ~VF_COMPLEX,
+                         length, data);
     } else {
-        res->v_flags = (v1->v_flags | v2->v_flags |
-                        VF_COMPLEX) & ~ VF_REAL;
-        res->v_compdata = (ngcomplex_t *) data;
+        res = dvec_alloc(mkcname(what, v1->v_name, v2->v_name),
+                         SV_NOTYPE,
+                         (v1->v_flags | v2->v_flags | VF_COMPLEX) & ~VF_REAL,
+                         length, data);
     }
-
-    res->v_name = mkcname(what, v1->v_name, v2->v_name);
-    res->v_length = length;
 
     /* This is a non-obvious thing */
     if (v1->v_scale != v2->v_scale) {
@@ -600,9 +597,7 @@ op_range(struct pnode *arg1, struct pnode *arg2)
     }
 
     if (up < low) {
-        td = up;
-        up = low;
-        low = td;
+        SWAP(double, up, low);
         rev = TRUE;
     }
 
@@ -613,16 +608,14 @@ op_range(struct pnode *arg1, struct pnode *arg2)
             len++;
     }
 
-    res = alloc(struct dvec);
-    ZERO(res, struct dvec);
-    res->v_name = mkcname('R', v->v_name, ind->v_name);
-    res->v_type = v->v_type;
-    res->v_flags = v->v_flags;
+    res = dvec_alloc(mkcname('R', v->v_name, ind->v_name),
+                     v->v_type,
+                     v->v_flags,
+                     len, NULL);
 
     res->v_gridtype = v->v_gridtype;
     res->v_plottype = v->v_plottype;
     res->v_defcolor = v->v_defcolor;
-    res->v_length = len;
     res->v_scale = /* nscale; */ scale;
     /* Dave says get rid of this
        res->v_numdims = v->v_numdims;
@@ -631,11 +624,6 @@ op_range(struct pnode *arg1, struct pnode *arg2)
     */
     res->v_numdims = 1;
     res->v_dims[0] = len;
-
-    if (isreal(res))
-        res->v_realdata = TMALLOC(double, len);
-    else
-        res->v_compdata = TMALLOC(ngcomplex_t, len);
 
     /* Toss in the data */
 
@@ -650,10 +638,7 @@ op_range(struct pnode *arg1, struct pnode *arg2)
             if (isreal(res)) {
                 res->v_realdata[j] = v->v_realdata[i];
             } else {
-                realpart(res->v_compdata[j]) =
-                    realpart(v->v_compdata[i]);
-                imagpart(res->v_compdata[j]) =
-                    imagpart(v->v_compdata[i]);
+                res->v_compdata[j] = v->v_compdata[i];
             }
             j++;
         }
@@ -740,9 +725,7 @@ op_ind(struct pnode *arg1, struct pnode *arg2)
         up = (int)floor(imagpart(ind->v_compdata[0]) + 0.5);
     }
     if (up < down) {
-        i = up;
-        up = down;
-        down = i;
+        SWAP(int, up, down);
         rev = TRUE;
     }
     if (up < 0) {
@@ -770,16 +753,14 @@ op_ind(struct pnode *arg1, struct pnode *arg2)
         length = blocksize * (up - down + 1);
 
     /* Make up the new vector. */
-    res = alloc(struct dvec);
-    ZERO(res, struct dvec);
-    res->v_name = mkcname('[', v->v_name, ind->v_name);
-    res->v_type = v->v_type;
-    res->v_flags = v->v_flags;
+    res = dvec_alloc(mkcname('[', v->v_name, ind->v_name),
+                     v->v_type,
+                     v->v_flags,
+                     length, NULL);
 
     res->v_defcolor = v->v_defcolor;
     res->v_gridtype = v->v_gridtype;
     res->v_plottype = v->v_plottype;
-    res->v_length = length;
     res->v_numdims = newdim;
     if (up != down) {
         for (i = 0; i < newdim; i++)
@@ -789,11 +770,6 @@ op_ind(struct pnode *arg1, struct pnode *arg2)
         for (i = 0; i < newdim; i++)
             res->v_dims[i] = v->v_dims[i + 1];
     }
-
-    if (isreal(res))
-        res->v_realdata = TMALLOC(double, length);
-    else
-        res->v_compdata = TMALLOC(ngcomplex_t, length);
 
     /* And toss in the new data */
     for (j = 0; j < up - down + 1; j++) {
@@ -806,10 +782,8 @@ op_ind(struct pnode *arg1, struct pnode *arg2)
                 res->v_realdata[k * blocksize + i] =
                     v->v_realdata[(down + j) * blocksize + i];
             } else {
-                realpart(res->v_compdata[k * blocksize + i]) =
-                    realpart(v->v_compdata[(down + j) * blocksize + i]);
-                imagpart(res->v_compdata[k * blocksize + i]) =
-                    imagpart(v->v_compdata[(down + j) * blocksize + i]);
+                res->v_compdata[k * blocksize + i] =
+                    v->v_compdata[(down + j) * blocksize + i];
             }
     }
 
@@ -838,7 +812,7 @@ op_ind(struct pnode *arg1, struct pnode *arg2)
 
 /* Apply a function to an argument. Complex functions are called as follows:
  *  cx_something(data, type, length, &newlength, &newtype),
- *  and returns a char * that is cast to complex or double.
+ *  and returns a void * that is cast to complex or double.
  */
 
 static void *
@@ -904,7 +878,11 @@ apply_func(struct func *func, struct pnode *arg)
             fprintf(cp_err, "Error: bad v() syntax\n");
             return (NULL);
         }
-        t = vec_fromplot(arg->pn_value->v_name, plot_cur);
+        /* try not using the current plot, but the plot set in the arg... vector */
+        if(arg->pn_value->v_plot && arg->pn_value->v_plot->pl_typename)
+            t = vec_fromplot(arg->pn_value->v_name, get_plot(arg->pn_value->v_plot->pl_typename));
+        else
+            t = vec_fromplot(arg->pn_value->v_name, plot_cur);
         if (!t) {
             fprintf(cp_err, "Error: no such vector %s\n", arg->pn_value->v_name);
             return (NULL);
@@ -920,37 +898,33 @@ apply_func(struct func *func, struct pnode *arg)
 
     for (; v; v = v->v_link2) {
 
+        char *name;
+
         data = apply_func_funcall(func, v, &len, &type);
 
         if (!data)
             return (NULL);
 
-        t = alloc(struct dvec);
-        ZERO(t, struct dvec);
-
-        t->v_flags = (v->v_flags & ~VF_COMPLEX & ~VF_REAL &
-                      ~VF_PERMANENT & ~VF_MINGIVEN & ~VF_MAXGIVEN);
-        t->v_flags |= type;
 #ifdef FTEDEBUG
         if (ft_evdb)
             fprintf(cp_err,
                     "apply_func: func %s to %s len %d, type %d\n",
                     func->fu_name, v->v_name, len, type);
 #endif
-        if (isreal(t))
-            t->v_realdata = (double *) data;
-        else
-            t->v_compdata = (ngcomplex_t *) data;
 
         if (eq(func->fu_name, "minus"))
-            t->v_name = mkcname('a', func->fu_name, v->v_name);
+            name = mkcname('a', func->fu_name, v->v_name);
         else if (eq(func->fu_name, "not"))
-            t->v_name = mkcname('c', func->fu_name, v->v_name);
+            name = mkcname('c', func->fu_name, v->v_name);
         else
-            t->v_name = mkcname('b', v->v_name, NULL);
+            name = mkcname('b', v->v_name, NULL);
 
-        t->v_type = v->v_type; /* This is strange too. */
-        t->v_length = len;
+        t = dvec_alloc(name,
+                       v->v_type, /* This is strange too. */
+                       (v->v_flags & ~VF_COMPLEX & ~VF_REAL &
+                        ~VF_PERMANENT & ~VF_MINGIVEN & ~VF_MAXGIVEN) | type,
+                       len, data);
+
         t->v_scale = v->v_scale;
 
         /* Copy a few useful things */
@@ -962,6 +936,12 @@ apply_func(struct func *func, struct pnode *arg)
             t->v_dims[i] = v->v_dims[i];
 
         vec_new(t);
+
+        /* try to figure out the v_type, depending on the function */
+        if (eq(func->fu_name, "cph") || eq(func->fu_name, "ph"))
+            t->v_type = SV_PHASE;
+        else if (eq(func->fu_name, "db"))
+            t->v_type = SV_DB;
 
         if (end)
             end->v_link2 = t;
@@ -1001,20 +981,18 @@ op_not(struct pnode *arg)
 static char *
 mkcname(char what, char *v1, char *v2)
 {
-    char buf[BSIZE_SP], *s;
-
-    if (what == 'a')
-        (void) sprintf(buf, "%s(%s)", v1, v2);
-    else if (what == 'b')
-        (void) sprintf(buf, "-(%s)", v1);
-    else if (what == 'c')
-        (void) sprintf(buf, "~(%s)", v1);
-    else if (what == '[')
-        (void) sprintf(buf, "%s[%s]", v1, v2);
-    else if (what == 'R')
-        (void) sprintf(buf, "%s[[%s]]", v1, v2);
-    else
-        (void) sprintf(buf, "(%s)%c(%s)", v1, what, v2);
-    s = copy(buf);
-    return (s);
+    switch (what) {
+    case 'a':
+        return tprintf("%s(%s)", v1, v2);
+    case 'b':
+        return tprintf("-(%s)", v1);
+    case 'c':
+        return tprintf("~(%s)", v1);
+    case '[':
+        return tprintf("%s[%s]", v1, v2);
+    case 'R':
+        return tprintf("%s[[%s]]", v1, v2);
+    default:
+        return tprintf("(%s)%c(%s)", v1, what, v2);
+    }
 }

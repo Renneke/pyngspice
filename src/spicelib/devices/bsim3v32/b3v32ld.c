@@ -31,12 +31,41 @@
 #define DELTA_3 0.02
 #define DELTA_4 0.02
 
+#ifdef USE_OMP
+int BSIM3v32LoadOMP(BSIM3v32instance *here, CKTcircuit *ckt);
+void BSIM3v32LoadRhsMat(GENmodel *inModel, CKTcircuit *ckt);
+#endif
 
 int
 BSIM3v32load (GENmodel *inModel, CKTcircuit *ckt)
 {
+#ifdef USE_OMP
+    int idx;
+    BSIM3v32model *model = (BSIM3v32model*)inModel;
+    int error = 0;
+    BSIM3v32instance **InstArray;
+    InstArray = model->BSIM3v32InstanceArray;
+
+#pragma omp parallel for
+    for (idx = 0; idx < model->BSIM3v32InstCount; idx++) {
+        BSIM3v32instance *here = InstArray[idx];
+        int local_error = BSIM3v32LoadOMP(here, ckt);
+        if (local_error)
+            error = local_error;
+    }
+
+    BSIM3v32LoadRhsMat(inModel, ckt);
+
+    return error;
+}
+
+
+int BSIM3v32LoadOMP(BSIM3v32instance *here, CKTcircuit *ckt) {
+    BSIM3v32model *model = BSIM3v32modPtr(here);
+#else
 BSIM3v32model *model = (BSIM3v32model*)inModel;
 BSIM3v32instance *here;
+#endif
 double SourceSatCurrent, DrainSatCurrent;
 double ag0, qgd, qgs, qgb, von, cbhat, VgstNVt, ExpVgst;
 double cdrain, cdhat, cdreq, ceqbd, ceqbs, ceqqb, ceqqd, ceqqg, ceq, geq;
@@ -141,10 +170,12 @@ ChargeComputationNeeded =
                  ((ckt->CKTmode & (MODEDCTRANCURVE | MODEAC | MODETRAN | MODEINITSMSIG)) ||
                  ((ckt->CKTmode & MODETRANOP) && (ckt->CKTmode & MODEUIC)))
                  ? 1 : 0;
-for (; model != NULL; model = model->BSIM3v32nextModel)
-{    for (here = model->BSIM3v32instances; here != NULL;
-          here = here->BSIM3v32nextInstance)
+#ifndef USE_OMP
+for (; model != NULL; model = BSIM3v32nextModel(model))
+{    for (here = BSIM3v32instances(model); here != NULL;
+          here = BSIM3v32nextInstance(here))
      {
+#endif
                Check = 1;
           ByPass = 0;
           pParam = here->pParam;
@@ -2470,6 +2501,7 @@ finished:
                   
                   if (here->BSIM3v32drainPerimeter < pParam->BSIM3v32weff)
                   {
+                      czbdsw = 0.0;
                       /* Added revision dependent code */
                       switch (model->BSIM3v32intVersion) {
                         case BSIM3v32V324:
@@ -2483,18 +2515,30 @@ finished:
                           czbdswg = model->BSIM3v32unitLengthGateSidewallJctCap
                             * here->BSIM3v32drainPerimeter;
                       }
-                  czbdsw = 0.0;
                   }
                   else
                   {
-                  czbdsw = model->BSIM3v32unitLengthSidewallTempJctCap
-                         * (here->BSIM3v32drainPerimeter - pParam->BSIM3v32weff);
-                  czbdswg = model->BSIM3v32unitLengthGateSidewallTempJctCap
-                          *  pParam->BSIM3v32weff;
+                      /* Added revision dependent code */
+                      switch (model->BSIM3v32intVersion) {
+                        case BSIM3v32V324:
+                        case BSIM3v32V323:
+                          czbdsw = model->BSIM3v32unitLengthSidewallTempJctCap
+                                 * (here->BSIM3v32drainPerimeter - pParam->BSIM3v32weff);
+                          czbdswg = model->BSIM3v32unitLengthGateSidewallTempJctCap
+                                  *  pParam->BSIM3v32weff;
+                          break;
+                        case BSIM3v32V322:
+                        case BSIM3v32V32:
+                        default:
+                          czbdsw = model->BSIM3v32unitLengthSidewallJctCap
+                                 * (here->BSIM3v32drainPerimeter - pParam->BSIM3v32weff);
+                          czbdswg = model->BSIM3v32unitLengthGateSidewallJctCap
+                                  *  pParam->BSIM3v32weff;
+                      }
                   }
                   if (here->BSIM3v32sourcePerimeter < pParam->BSIM3v32weff)
                   {
-                  czbssw = 0.0;
+                      czbssw = 0.0;
                       /* Added revision dependent code */
                       switch (model->BSIM3v32intVersion) {
                         case BSIM3v32V324:
@@ -2505,7 +2549,7 @@ finished:
                         case BSIM3v32V322:
                         case BSIM3v32V32:
                         default:
-                          czbsswg =        model->BSIM3v32unitLengthGateSidewallJctCap
+                          czbsswg = model->BSIM3v32unitLengthGateSidewallJctCap
                             * here->BSIM3v32sourcePerimeter;
                       }
                   }
@@ -2531,32 +2575,67 @@ finished:
                   }
 
               } else {
-                  error = ACM_junctionCapacitances(
-                  model->BSIM3v32acmMod,
-                  model->BSIM3v32calcacm,
-                  here->BSIM3v32geo,
-                  model->BSIM3v32hdif,
-                  model->BSIM3v32wmlt,
-                  here->BSIM3v32w,
-                  model->BSIM3v32xw,
-                  here->BSIM3v32drainAreaGiven,
-                  here->BSIM3v32drainArea,
-                  here->BSIM3v32drainPerimeterGiven,
-                  here->BSIM3v32drainPerimeter,
-                  here->BSIM3v32sourceAreaGiven,
-                  here->BSIM3v32sourceArea,
-                  here->BSIM3v32sourcePerimeterGiven,
-                  here->BSIM3v32sourcePerimeter,
-                  model->BSIM3v32unitAreaTempJctCap,
-                  model->BSIM3v32unitLengthSidewallTempJctCap,
-                  model->BSIM3v32unitLengthGateSidewallJctCap,
-                  &czbd,
-                  &czbdsw,
-                  &czbdswg,
-                  &czbs,
-                  &czbssw,
-                  &czbsswg
-                  );
+                  /* Added revision dependent code */
+                  switch (model->BSIM3v32intVersion) {
+                    case BSIM3v32V324:
+                    case BSIM3v32V323:
+                      error = ACM_junctionCapacitances(
+                      model->BSIM3v32acmMod,
+                      model->BSIM3v32calcacm,
+                      here->BSIM3v32geo,
+                      model->BSIM3v32hdif,
+                      model->BSIM3v32wmlt,
+                      here->BSIM3v32w,
+                      model->BSIM3v32xw,
+                      here->BSIM3v32drainAreaGiven,
+                      here->BSIM3v32drainArea,
+                      here->BSIM3v32drainPerimeterGiven,
+                      here->BSIM3v32drainPerimeter,
+                      here->BSIM3v32sourceAreaGiven,
+                      here->BSIM3v32sourceArea,
+                      here->BSIM3v32sourcePerimeterGiven,
+                      here->BSIM3v32sourcePerimeter,
+                      model->BSIM3v32unitAreaTempJctCap,
+                      model->BSIM3v32unitLengthSidewallTempJctCap,
+                      model->BSIM3v32unitLengthGateSidewallTempJctCap,
+                      &czbd,
+                      &czbdsw,
+                      &czbdswg,
+                      &czbs,
+                      &czbssw,
+                      &czbsswg
+                      );
+                      break;
+                    case BSIM3v32V322:
+                    case BSIM3v32V32:
+                    default:
+                      error = ACM_junctionCapacitances(
+                      model->BSIM3v32acmMod,
+                      model->BSIM3v32calcacm,
+                      here->BSIM3v32geo,
+                      model->BSIM3v32hdif,
+                      model->BSIM3v32wmlt,
+                      here->BSIM3v32w,
+                      model->BSIM3v32xw,
+                      here->BSIM3v32drainAreaGiven,
+                      here->BSIM3v32drainArea,
+                      here->BSIM3v32drainPerimeterGiven,
+                      here->BSIM3v32drainPerimeter,
+                      here->BSIM3v32sourceAreaGiven,
+                      here->BSIM3v32sourceArea,
+                      here->BSIM3v32sourcePerimeterGiven,
+                      here->BSIM3v32sourcePerimeter,
+                      model->BSIM3v32unitAreaJctCap,
+                      model->BSIM3v32unitLengthSidewallJctCap,
+                      model->BSIM3v32unitLengthGateSidewallJctCap,
+                      &czbd,
+                      &czbdsw,
+                      &czbdswg,
+                      &czbs,
+                      &czbssw,
+                      &czbsswg
+                      );
+                  }
                   if (error)
                       return(error);
               }
@@ -2729,41 +2808,11 @@ line755:
 
           if (model->BSIM3v32capMod == 0)
           {
-              /* Added revision dependent code */
-              switch (model->BSIM3v32intVersion) {
-                case BSIM3v32V324:
-                case BSIM3v32V323:
-                  /* code merge -JX */
-                  cgdo = pParam->BSIM3v32cgdo;
-                  qgdo = pParam->BSIM3v32cgdo * vgd;
-                  cgso = pParam->BSIM3v32cgso;
-                  qgso = pParam->BSIM3v32cgso * vgs;
-                  break;
-                case BSIM3v32V322:
-                case BSIM3v32V32:
-                default:
-                  if (vgd < 0.0)
-                    {
-                      cgdo = pParam->BSIM3v32cgdo;
-                      qgdo = pParam->BSIM3v32cgdo * vgd;
-                    }
-                  else
-                    {
-                      cgdo = pParam->BSIM3v32cgdo;
-                      qgdo = pParam->BSIM3v32cgdo * vgd;
-                    }
-
-                  if (vgs < 0.0)
-                    {
-                      cgso = pParam->BSIM3v32cgso;
-                      qgso = pParam->BSIM3v32cgso * vgs;
-                    }
-                  else
-                    {
-                      cgso = pParam->BSIM3v32cgso;
-                      qgso = pParam->BSIM3v32cgso * vgs;
-                    }
-              }
+              /* code merge -JX */
+              cgdo = pParam->BSIM3v32cgdo;
+              qgdo = pParam->BSIM3v32cgdo * vgd;
+              cgso = pParam->BSIM3v32cgso;
+              qgso = pParam->BSIM3v32cgso * vgs;
           }
           else if (model->BSIM3v32capMod == 1)
           {   if (vgd < 0.0)
@@ -3255,6 +3304,15 @@ line900:
 
           m = here->BSIM3v32m;
 
+#ifdef USE_OMP
+          here->BSIM3v32rhsG = m * ceqqg;
+          here->BSIM3v32rhsB = m * (ceqbs + ceqbd + ceqqb);
+          here->BSIM3v32rhsD = m * (ceqbd - cdreq - ceqqd);
+          here->BSIM3v32rhsS = m * (cdreq + ceqbs + ceqqg
+              + ceqqb + ceqqd);
+          if (here->BSIM3v32nqsMod)
+              here->BSIM3v32rhsQ = m * (cqcheq - cqdef);
+#else
           (*(ckt->CKTrhs + here->BSIM3v32gNode) -= m * ceqqg);
           (*(ckt->CKTrhs + here->BSIM3v32bNode) -= m * (ceqbs + ceqbd + ceqqb));
           (*(ckt->CKTrhs + here->BSIM3v32dNodePrime) += m * (ceqbd - cdreq - ceqqd));
@@ -3262,12 +3320,66 @@ line900:
                                                      + ceqqb + ceqqd));
           if (here->BSIM3v32nqsMod)
             *(ckt->CKTrhs + here->BSIM3v32qNode) += m * (cqcheq - cqdef);
+#endif
 
           /*
            *  load y matrix
            */
 
           T1 = qdef * here->BSIM3v32gtau;
+#ifdef USE_OMP
+          here->BSIM3v32DdPt = m * here->BSIM3v32drainConductance;
+          here->BSIM3v32GgPt = m * (gcggb - ggtg);
+          here->BSIM3v32SsPt = m * here->BSIM3v32sourceConductance;
+          here->BSIM3v32BbPt = m * (here->BSIM3v32gbd + here->BSIM3v32gbs
+              - gcbgb - gcbdb - gcbsb - here->BSIM3v32gbbs);
+          here->BSIM3v32DPdpPt = m * (here->BSIM3v32drainConductance
+              + here->BSIM3v32gds + here->BSIM3v32gbd
+              + RevSum + gcddb + dxpart * ggtd
+              + T1 * ddxpart_dVd + gbdpdp);
+          here->BSIM3v32SPspPt = m * (here->BSIM3v32sourceConductance
+              + here->BSIM3v32gds + here->BSIM3v32gbs
+              + FwdSum + gcssb + sxpart * ggts
+              + T1 * dsxpart_dVs + gbspsp);
+          here->BSIM3v32DdpPt = m * here->BSIM3v32drainConductance;
+          here->BSIM3v32GbPt = m * (gcggb + gcgdb + gcgsb + ggtb);
+          here->BSIM3v32GdpPt = m * (gcgdb - ggtd);
+          here->BSIM3v32GspPt = m * (gcgsb - ggts);
+          here->BSIM3v32SspPt = m * here->BSIM3v32sourceConductance;
+          here->BSIM3v32BgPt = m * (gcbgb - here->BSIM3v32gbgs);
+          here->BSIM3v32BdpPt = m * (gcbdb - here->BSIM3v32gbd + gbbdp);
+          here->BSIM3v32BspPt = m * (gcbsb - here->BSIM3v32gbs + gbbsp);
+          here->BSIM3v32DPdPt = m * here->BSIM3v32drainConductance;
+          here->BSIM3v32DPgPt = m * (Gm + gcdgb + dxpart * ggtg
+              + T1 * ddxpart_dVg + gbdpg);
+          here->BSIM3v32DPbPt = m * (here->BSIM3v32gbd - Gmbs + gcdgb + gcddb
+              + gcdsb - dxpart * ggtb
+              - T1 * ddxpart_dVb - gbdpb);
+          here->BSIM3v32DPspPt = m * (here->BSIM3v32gds + FwdSum - gcdsb
+              - dxpart * ggts - T1 * ddxpart_dVs - gbdpsp);
+          here->BSIM3v32SPgPt = m * (gcsgb - Gm + sxpart * ggtg
+              + T1 * dsxpart_dVg + gbspg);
+          here->BSIM3v32SPsPt = m * here->BSIM3v32sourceConductance;
+          here->BSIM3v32SPbPt = m * (here->BSIM3v32gbs + Gmbs + gcsgb + gcsdb
+              + gcssb - sxpart * ggtb
+              - T1 * dsxpart_dVb - gbspb);
+          here->BSIM3v32SPdpPt = m * (here->BSIM3v32gds + RevSum - gcsdb
+              - sxpart * ggtd - T1 * dsxpart_dVd - gbspdp);
+
+          if (here->BSIM3v32nqsMod)
+          {
+              here->BSIM3v32QqPt = m * (gqdef + here->BSIM3v32gtau);
+
+              here->BSIM3v32DPqPt = m * (dxpart * here->BSIM3v32gtau);
+              here->BSIM3v32SPqPt = m * (sxpart * here->BSIM3v32gtau);
+              here->BSIM3v32GqPt = m * here->BSIM3v32gtau;
+
+              here->BSIM3v32QgPt = m * (ggtg - gcqgb);
+              here->BSIM3v32QdpPt = m * (ggtd - gcqdb);
+              here->BSIM3v32QspPt = m * (ggts - gcqsb);
+              here->BSIM3v32QbPt = m * (ggtb - gcqbb);
+          }
+#else
           (*(here->BSIM3v32DdPtr) += m * here->BSIM3v32drainConductance);
           (*(here->BSIM3v32GgPtr) += m * (gcggb - ggtg));
           (*(here->BSIM3v32SsPtr) += m * here->BSIM3v32sourceConductance);
@@ -3319,12 +3431,78 @@ line900:
               *(here->BSIM3v32QspPtr) += m * (ggts - gcqsb);
               *(here->BSIM3v32QbPtr) += m * (ggtb - gcqbb);
             }
+#endif
 
 line1000:  ;
 
+#ifndef USE_OMP
      }  /* End of Mosfet Instance */
 }   /* End of Model Instance */
+#endif
 
 return(OK);
 }
 
+#ifdef USE_OMP
+void BSIM3v32LoadRhsMat(GENmodel *inModel, CKTcircuit *ckt)
+{
+   int InstCount, idx;
+   BSIM3v32instance **InstArray;
+   BSIM3v32instance *here;
+   BSIM3v32model *model = (BSIM3v32model*)inModel;
+
+    InstArray = model->BSIM3v32InstanceArray;
+    InstCount = model->BSIM3v32InstCount;
+
+    for (idx = 0; idx < InstCount; idx++) {
+        here = InstArray[idx];
+        model = BSIM3v32modPtr(here);
+        /* Update b for Ax = b */
+        (*(ckt->CKTrhs + here->BSIM3v32gNode) -= here->BSIM3v32rhsG);
+        (*(ckt->CKTrhs + here->BSIM3v32bNode) -= here->BSIM3v32rhsB);
+        (*(ckt->CKTrhs + here->BSIM3v32dNodePrime) += here->BSIM3v32rhsD);
+        (*(ckt->CKTrhs + here->BSIM3v32sNodePrime) += here->BSIM3v32rhsS);
+        if (here->BSIM3v32nqsMod)
+            (*(ckt->CKTrhs + here->BSIM3v32qNode) += here->BSIM3v32rhsQ);
+
+        /* Update A for Ax = b */
+        (*(here->BSIM3v32DdPtr) += here->BSIM3v32DdPt);
+        (*(here->BSIM3v32GgPtr) += here->BSIM3v32GgPt);
+        (*(here->BSIM3v32SsPtr) += here->BSIM3v32SsPt);
+        (*(here->BSIM3v32BbPtr) += here->BSIM3v32BbPt);
+        (*(here->BSIM3v32DPdpPtr) += here->BSIM3v32DPdpPt);
+        (*(here->BSIM3v32SPspPtr) += here->BSIM3v32SPspPt);
+        (*(here->BSIM3v32DdpPtr) -= here->BSIM3v32DdpPt);
+        (*(here->BSIM3v32GbPtr) -= here->BSIM3v32GbPt);
+        (*(here->BSIM3v32GdpPtr) += here->BSIM3v32GdpPt);
+        (*(here->BSIM3v32GspPtr) += here->BSIM3v32GspPt);
+        (*(here->BSIM3v32SspPtr) -= here->BSIM3v32SspPt);
+        (*(here->BSIM3v32BgPtr) += here->BSIM3v32BgPt);
+        (*(here->BSIM3v32BdpPtr) += here->BSIM3v32BdpPt);
+        (*(here->BSIM3v32BspPtr) += here->BSIM3v32BspPt);
+        (*(here->BSIM3v32DPdPtr) -= here->BSIM3v32DPdPt);
+        (*(here->BSIM3v32DPgPtr) += here->BSIM3v32DPgPt);
+        (*(here->BSIM3v32DPbPtr) -= here->BSIM3v32DPbPt);
+        (*(here->BSIM3v32DPspPtr) -= here->BSIM3v32DPspPt);
+        (*(here->BSIM3v32SPgPtr) += here->BSIM3v32SPgPt);
+        (*(here->BSIM3v32SPsPtr) -= here->BSIM3v32SPsPt);
+        (*(here->BSIM3v32SPbPtr) -= here->BSIM3v32SPbPt);
+        (*(here->BSIM3v32SPdpPtr) -= here->BSIM3v32SPdpPt);
+
+        if (here->BSIM3v32nqsMod)
+        {
+            *(here->BSIM3v32QqPtr) += here->BSIM3v32QqPt;
+
+            *(here->BSIM3v32DPqPtr) += here->BSIM3v32DPqPt;
+            *(here->BSIM3v32SPqPtr) += here->BSIM3v32SPqPt;
+            *(here->BSIM3v32GqPtr) -= here->BSIM3v32GqPt;
+
+            *(here->BSIM3v32QgPtr) += here->BSIM3v32QgPt;
+            *(here->BSIM3v32QdpPtr) += here->BSIM3v32QdpPt;
+            *(here->BSIM3v32QspPtr) += here->BSIM3v32QspPt;
+            *(here->BSIM3v32QbPtr) += here->BSIM3v32QbPt;
+        }
+
+    }
+}
+#endif

@@ -17,6 +17,7 @@
 #include "ngspice/miftypes.h"
 
 #include "ngspice/evt.h"
+#include "ngspice/enh.h"
 #include "ngspice/mif.h"
 #include "ngspice/evtproto.h"
 #include "ngspice/ipctiein.h"
@@ -198,7 +199,7 @@ DCpss(CKTcircuit *ckt,
         ckt->CKTtimeListSize = (int)(1 / ckt->CKTguessedFreq / maxstepsize + 0.5);
         ltra_num = CKTtypelook("LTRA");
         if (ltra_num >= 0 && ckt->CKThead[ltra_num] != NULL)
-            ckt->CKTtimePoints = NEWN(double, ckt->CKTtimeListSize);
+            ckt->CKTtimePoints = TMALLOC(double, ckt->CKTtimeListSize);
         /* end LTRA code addition */
 
         /* Breakpoints initialization */
@@ -287,36 +288,6 @@ DCpss(CKTcircuit *ckt,
         if(converged != 0) {
             fprintf(stdout,"\nTransient solution failed -\n");
             CKTncDump(ckt);
-/*          CKTnode *node;
-            double new, old, tol;
-            int i=1;
-
-            fprintf(stdout,"\nTransient solution failed -\n\n");
-            fprintf(stdout,"Last Node Voltages\n");
-            fprintf(stdout,"------------------\n\n");
-            fprintf(stdout,"%-30s %20s %20s\n", "Node", "Last Voltage",
-                                                               "Previous Iter");
-            fprintf(stdout,"%-30s %20s %20s\n", "----", "------------",
-                                                               "-------------");
-            for(node=ckt->CKTnodes->next;node;node=node->next) {
-                if (strstr(node->name, "#branch") || !strstr(node->name, "#")) {
-                    new =  ckt->CKTrhsOld [i] ;
-                    old =  ckt->CKTrhs [i] ;
-                    fprintf(stdout,"%-30s %20g %20g", node->name, new, old);
-                    if(node->type == SP_VOLTAGE) {
-                        tol =  ckt->CKTreltol * (MAX(fabs(old),fabs(new))) +
-                                ckt->CKTvoltTol;
-                    } else {
-                        tol =  ckt->CKTreltol * (MAX(fabs(old),fabs(new))) +
-                                ckt->CKTabstol;
-                    }
-                    if (fabs(new-old) >tol ) {
-                        fprintf(stdout," *");
-                    }
-                    fprintf(stdout,"\n");
-                }
-                i++;
-            } */
             fprintf(stdout,"\n");
             fflush(stdout);
         } else if (!ft_noacctprint && !ft_noinitprint) {
@@ -325,7 +296,7 @@ DCpss(CKTcircuit *ckt,
             fprintf(stdout,"%-30s %15s\n", "Node", "Voltage");
             fprintf(stdout,"%-30s %15s\n", "----", "-------");
             for(node=ckt->CKTnodes->next;node;node=node->next) {
-                if (strstr(node->name, "#branch") || !strstr(node->name, "#"))
+                if (strstr(node->name, "#branch") || !strchr(node->name, '#'))
                     fprintf(stdout,"%-30s %15g\n", node->name,
                                               ckt->CKTrhsOld[node->number]);
             }
@@ -389,7 +360,7 @@ DCpss(CKTcircuit *ckt,
         ckt->CKTag[0]=ckt->CKTag[1]=0;
 
         /* State0 copied into State1 - DEPRECATED LEGACY function - to be replaced with memmove() */
-        bcopy(ckt->CKTstate0, ckt->CKTstate1,
+        memcpy(ckt->CKTstate1, ckt->CKTstate0,
               (size_t) ckt->CKTnumStates * sizeof(double));
 
         /* Statistics Initialization using a macro at the beginning of this code */
@@ -475,7 +446,7 @@ DCpss(CKTcircuit *ckt,
 #ifdef XSPICE
 /* gtri - modify - wbk - 12/19/90 - Send IPC stuff */
 
-    if(g_ipc.enabled) {
+    if ((g_ipc.enabled) || wantevtdata) {
 
         if (pss_state == PSS)
         {
@@ -624,7 +595,6 @@ DCpss(CKTcircuit *ckt,
     case SHOOTING:
     {
         double offset, interval, nextBreak ;
-        int i ;
         /* Calculation of error norms of RHS solution of every accepted nextTime */
         err = 0 ;
         for (i = 0 ; i < msize ; i++)
@@ -793,7 +763,7 @@ DCpss(CKTcircuit *ckt,
             for (i = 0, node = ckt->CKTnodes->next ; node ; i++, node = node->next)
             {
                 /* Voltage Node */
-                if (!strstr (node->name, "#"))
+                if (!strchr (node->name, '#'))
                 {
                     if (fabs (err_conv [i]) > (fabs (RHS_max [i] - RHS_min [i]) * ckt->CKTreltol + ckt->CKTvoltTol) *
                         ckt->CKTtrtol * ckt->CKTsteady_coeff)
@@ -1399,10 +1369,10 @@ resume:
         ckt->CKTstat->STATtimePts ++;
         ckt->CKTmode = (ckt->CKTmode&MODEUIC)|MODETRAN | MODEINITPRED;
         if(firsttime) {
-            for(i=0;i<ckt->CKTnumStates;i++) {
-                ckt->CKTstate2[i] = ckt->CKTstate1[i];
-                ckt->CKTstate3[i] = ckt->CKTstate1[i];
-            }
+            memcpy(ckt->CKTstate2, ckt->CKTstate1,
+                   (size_t) ckt->CKTnumStates * sizeof(double));
+            memcpy(ckt->CKTstate3, ckt->CKTstate1,
+                   (size_t) ckt->CKTnumStates * sizeof(double));
         }
         /* txl, cpl addition */
         if (converged == 1111) {
@@ -1420,7 +1390,7 @@ resume:
 #endif
             ckt->CKTdelta = ckt->CKTdelta/8;
 #ifdef STEPDEBUG
-            fprintf (stderr, "delta cut to %g for non-convergance\n", ckt->CKTdelta) ;
+            fprintf (stderr, "delta cut to %g for non-convergence\n", ckt->CKTdelta) ;
             fflush(stdout);
 #endif
             if(firsttime) {
@@ -1464,30 +1434,32 @@ resume:
                 UPDATE_STATS(DOING_TRAN);
                 return(error);
             }
-            if(newdelta > .9 * ckt->CKTdelta) {
-                if((ckt->CKTorder == 1) && (ckt->CKTmaxOrder > 1)) { /* don't rise the order for backward Euler */
+            if (newdelta > .9 * ckt->CKTdelta) {
+                if ((ckt->CKTorder == 1) && (ckt->CKTmaxOrder > 1)) { /* don't rise the order for backward Euler */
                     newdelta = ckt->CKTdelta;
                     ckt->CKTorder = 2;
-                    error = CKTtrunc(ckt,&newdelta);
-                    if(error) {
+                    error = CKTtrunc(ckt, &newdelta);
+                    if (error) {
                         UPDATE_STATS(DOING_TRAN);
                         return(error);
                     }
-                    if(newdelta <= 1.05 * ckt->CKTdelta) {
+                    if (newdelta <= 1.05 * ckt->CKTdelta) {
                         ckt->CKTorder = 1;
                     }
                 }
                 /* time point OK  - 630 */
                 ckt->CKTdelta = newdelta;
 #ifdef NDEV
-                /* show a time process indicator, by Gong Ding, gdiso@ustc.edu */
-                if(ckt->CKTtime/ckt->CKTfinalTime*100<10.0)
-                    fprintf (stderr, "%%%3.2lf\b\b\b\b\b", ckt->CKTtime / ckt->CKTfinalTime * 100) ;
-                else  if(ckt->CKTtime/ckt->CKTfinalTime*100<100.0)
-                    fprintf (stderr, "%%%4.2lf\b\b\b\b\b\b", ckt->CKTtime / ckt->CKTfinalTime * 100) ;
-                else
-                    fprintf (stderr, "%%%5.2lf\b\b\b\b\b\b\b", ckt->CKTtime / ckt->CKTfinalTime * 100) ;
-                fflush(stdout);
+                if (!ft_norefprint) {
+                    /* show a time process indicator, by Gong Ding, gdiso@ustc.edu */
+                    if (ckt->CKTtime / ckt->CKTfinalTime * 100 < 10.0)
+                        fprintf(stderr, "%%%3.2lf\b\b\b\b\b", ckt->CKTtime / ckt->CKTfinalTime * 100);
+                    else  if (ckt->CKTtime / ckt->CKTfinalTime * 100 < 100.0)
+                        fprintf(stderr, "%%%4.2lf\b\b\b\b\b\b", ckt->CKTtime / ckt->CKTfinalTime * 100);
+                    else
+                        fprintf(stderr, "%%%5.2lf\b\b\b\b\b\b\b", ckt->CKTtime / ckt->CKTfinalTime * 100);
+                    fflush(stdout);
+                }
 #endif
 
 #ifdef STEPDEBUG
@@ -1605,7 +1577,7 @@ DFT
         tmp = Mag [i] * 2.0 / (double)ndata;
         Phase [i] *= 2.0 / (double)ndata;
         Freq [i] = i * FundFreq;
-        Mag [i] = sqrt (tmp * tmp + Phase [i] * Phase [i]);
+        Mag [i] = hypot (tmp, Phase [i]);
         Phase [i] = atan2 (Phase [i], tmp) * 180.0 / M_PI;
         nMag [i] = Mag [i] / Mag [1];
         nPhase [i] = Phase [i] - Phase [1];

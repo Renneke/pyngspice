@@ -6,12 +6,11 @@ Author: 1985 Thomas L. Quarles
 #include "ngspice/ngspice.h"
 #include "ngspice/cktdefs.h"
 #include "ngspice/sperror.h"
+#include "ngspice/cpextern.h"
 
 /* xmu=0:    Backward Euler
  * xmu=0.5:  trapezoidal (standard)
- * xmu=0.48: good damping of current ringing, e.g. in R.O.s.
  */
-#define xmu 0.5
 
 
 int
@@ -41,8 +40,8 @@ NIcomCof(CKTcircuit *ckt)
             break;
 
         case 2:
-            ckt->CKTag[0] = 1.0 / ckt->CKTdelta / (1.0 - xmu);
-            ckt->CKTag[1] = xmu / (1.0 - xmu);
+            ckt->CKTag[0] = 1.0 / ckt->CKTdelta / (1.0 - ckt->CKTxmu);
+            ckt->CKTag[1] = ckt->CKTxmu / (1.0 - ckt->CKTxmu);
             break;
 
         default:
@@ -63,7 +62,7 @@ NIcomCof(CKTcircuit *ckt)
         case 4:
         case 5:
         case 6:
-            bzero(ckt->CKTag,7*sizeof(double));
+            memset(ckt->CKTag, 0, 7*sizeof(double));
             ckt->CKTag[1] = -1/ckt->CKTdelta;
             /* first, set up the matrix */
             arg=0;
@@ -151,7 +150,7 @@ NIcomCof(CKTcircuit *ckt)
          *  MUST STILL ACCOUNT FOR ARRAY AGP()
          *  KEEP THE SAME NAME FOR GMAT
          */
-        bzero(ckt->CKTagp,7*sizeof(double));
+        memset(ckt->CKTagp, 0, 7*sizeof(double));
         /*   SET UP RHS OF EQUATIONS */
         ckt->CKTagp[0]=1;
         for(i=0;i<=ckt->CKTorder;i++) {

@@ -15,82 +15,54 @@ Author: 2010 Paolo Nenzi
 struct FTEparm {
     char *keyword;
     int id;
-    enum cp_types dataType;
     char *description;
 };
 
 
 static struct FTEparm FTEOPTtbl[] = {
-    { "decklineno",   FTEOPT_NLDECK, CP_NUM,  "Number of lines in the deck" },
-    { "netloadtime",  FTEOPT_NLT,    CP_REAL, "Netlist loading time"        },
-    { "netparsetime", FTEOPT_NPT,    CP_REAL, "Netlist parsing time"        }
+    { "decklineno",   FTEOPT_NLDECK, "Number of lines in the deck"    },
+    { "netloadtime",  FTEOPT_NLT,    "Netlist loading time"           },
+    { "netpreptime",  FTEOPT_PRT,    "Subckt and Param expansion time"},
+    { "netparsetime", FTEOPT_NPT,    "Netlist parsing time"           }
 };
 
 static const int FTEOPTcount = sizeof(FTEOPTtbl)/sizeof(*FTEOPTtbl);
 
-static struct variable *getFTEstat(struct circ *, int);
+static struct variable *getFTEstat(struct FTEparm *, FTESTATistics *, struct variable *);
 
 
 struct variable *
-ft_getstat(struct circ *ft_curckt, char *name)
+ft_getstat(struct circ *ci, char *name)
 {
     int i;
-    struct variable *v, *vars , *vv = NULL;
 
     if (name) {
         for (i = 0; i < FTEOPTcount; i++)
-            if (eq(name, FTEOPTtbl[i].keyword)) {
-                vv = getFTEstat(ft_curckt, FTEOPTtbl[i].id);
-                if (vv) {
-                    vv->va_type = FTEOPTtbl[i].dataType;
-                    vv->va_name = copy(FTEOPTtbl[i].description);
-                    vv->va_next = NULL;
-                    return (vv);
-                } else {
-                    return (NULL);
-                }
-            }
+            if (eq(name, FTEOPTtbl[i].keyword))
+                return getFTEstat(FTEOPTtbl + i, ci->FTEstats, NULL);
         return (NULL);
     } else {
-        for (i = 0, v = vars = NULL; i < FTEOPTcount; i++) {
-            if (v) {
-                v->va_next = getFTEstat(ft_curckt, FTEOPTtbl[i].id);
-                v = v->va_next;
-            } else {
-                vars = v = getFTEstat(ft_curckt, FTEOPTtbl[i].id);
-            }
-
-            v->va_type = FTEOPTtbl[i].dataType;
-            v->va_name = copy(FTEOPTtbl[i].description);
-
-        }
+        struct variable *vars = NULL;
+        for (i = FTEOPTcount; --i >= 0;)
+            vars = getFTEstat(FTEOPTtbl + i, ci->FTEstats, vars);
         return vars;
     }
 }
 
 
-/* This function fill the value field of the variable */
-
 static struct variable *
-getFTEstat(struct circ *ft_curckt, int id)
+getFTEstat(struct FTEparm *p, FTESTATistics *stat, struct variable *next)
 {
-
-    struct variable *v = TMALLOC(struct variable, 1);
-
-    switch (id) {
+    switch (p->id) {
     case FTEOPT_NLDECK:
-        v->va_num = ft_curckt->FTEstats->FTESTATdeckNumLines;
-        break;
+        return var_alloc_num(copy(p->description), stat->FTESTATdeckNumLines, next);
     case FTEOPT_NLT:
-        v->va_real = ft_curckt->FTEstats->FTESTATnetLoadTime;
-        break;
+        return var_alloc_real(copy(p->description), stat->FTESTATnetLoadTime, next);
+    case FTEOPT_PRT:
+        return var_alloc_real(copy(p->description), stat->FTESTATnetPrepTime, next);
     case FTEOPT_NPT:
-        v->va_real = ft_curckt->FTEstats->FTESTATnetParseTime;
-        break;
+        return var_alloc_real(copy(p->description), stat->FTESTATnetParseTime, next);
     default:
-        tfree(v);
-        return (NULL);
+        return NULL;
     }
-
-    return (v);
 }

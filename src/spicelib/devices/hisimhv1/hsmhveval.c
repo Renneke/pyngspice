@@ -4,11 +4,11 @@
  Copyright (C) 2012 Hiroshima University & STARC
 
  MODEL NAME : HiSIM_HV 
- ( VERSION : 1  SUBVERSION : 2  REVISION : 3 )
+ ( VERSION : 1  SUBVERSION : 2  REVISION : 4 )
  Model Parameter VERSION : 1.23
  FILE : hsmhveval.c
 
- DATE : 2012.4.6
+ DATE : 2013.04.30
 
  released by 
                 Hiroshima University &
@@ -160,7 +160,7 @@ June. 2008  (revised in June 2011)
 #define C_gidl_delta 0.5
 
 /* local variables used in macro functions */
-static double TMF0 , TMF1 , TMF2 , TMF3 , TMF4 , TMF5 , TMF6 ; 
+static double TMF0 , TMF1 , TMF2 , TMF3 , TMF4 ; 
 /*===========================================================*
 * pow
 *=================*/
@@ -254,6 +254,7 @@ static double TMF0 , TMF1 , TMF2 , TMF3 , TMF4 , TMF5 , TMF6 ;
     TMF2 = sqrt ( ( x ) *  ( x ) + 4.0 * ( delta ) * ( delta) ) ; \
     dx = 0.5 * ( 1.0 + ( x ) / TMF2 ) ; \
     y = 0.5 * ( ( x ) + TMF2 ) ; \
+    if( y < 0.0 ) { y=0.0; dx=0.0; } \
   }
 
 
@@ -271,10 +272,10 @@ static double TMF0 , TMF1 , TMF2 , TMF3 , TMF4 , TMF5 , TMF6 ;
   double xmax2 = (xmax) * (xmax) ; \
   double xp = 1.0 , xmp = 1.0 ; \
   int   m =0, mm =0; \
-  double arg =0.0, dnm =0.0; \
+  double arg_cp =0.0, dnm =0.0; \
   for ( m = 0 ; m < pw ; m ++ ) { xp *= x2 ; xmp *= xmax2 ; } \
-  arg = xp + xmp ; \
-  dnm = arg ; \
+  arg_cp = xp + xmp ; \
+  dnm = arg_cp ; \
   if ( pw == 1 || pw == 2 || pw == 4 || pw == 8 ) { \
     if ( pw == 1 ) { mm = 1 ; \
     } else if ( pw == 2 ) { mm = 2 ; \
@@ -284,7 +285,7 @@ static double TMF0 , TMF1 , TMF2 , TMF3 , TMF4 , TMF5 , TMF6 ;
   } else { dnm = Fn_Pow( dnm , 1.0 / ( 2.0 * pw ) ) ; } \
   dnm = 1.0 / dnm ; \
   y = (x) * (xmax) * dnm ; \
-  dx = (xmax) * xmp * dnm / arg ; \
+  dx = (xmax) * xmp * dnm / arg_cp ; \
 }
 
 /*---------------------------------------------------*
@@ -464,7 +465,7 @@ int HSMHVevaluate
   double Ps0 =0.0, Ps0_dVbs =0.0, Ps0_dVds =0.0, Ps0_dVgs =0.0, Ps0_dT =0.0 ;
   double Ps0_ini =0.0 ;
   double Ps0_iniA =0.0, Ps0_iniA_dVxb =0.0, Ps0_iniA_dVgb =0.0, Ps0_iniA_dT =0.0 ;
-  double Ps0_iniB =0.0, Ps0_iniB_dVxb =0.0, Ps0_iniB_dVgb =0.0, Ps0_iniB_dT =0.0 ;
+  double Ps0_iniB =0.0;/*, Ps0_iniB_dVxb =0.0, Ps0_iniB_dVgb =0.0, Ps0_iniB_dT =0.0 ;*/
   /* Psl : surface potential at the drain side */
   double Psl =0.0, Psl_dVbs =0.0, Psl_dVds =0.0, Psl_dVgs =0.0, Psl_dT =0.0 ;
   double Psl_lim =0.0, dPlim =0.0 ;
@@ -541,7 +542,7 @@ int HSMHVevaluate
   double costi0 =0.0 ;
   double costi1 =0.0, costi1_dT =0.0 ;
   double costi3 =0.0, costi3_dVb =0.0,    costi3_dVd =0.0,    costi3_dVg =0.0,    costi3_dT =0.0 ;
-  double              costi3_dVb_c3 =0.0, costi3_dVd_c3 =0.0, costi3_dVg_c3 =0.0, costi3_dT_c3 =0.0 ;
+  double              costi3_dVb_c3 =0.0, costi3_dVd_c3 =0.0, costi3_dVg_c3 =0.0;/*, costi3_dT_c3 =0.0 ;*/
   double costi4 =0.0, costi4_dT =0.0 ;
   double costi5 =0.0, costi5_dT =0.0 ;
   double costi6 =0.0, costi6_dT =0.0 ;
@@ -582,8 +583,8 @@ int HSMHVevaluate
   double bs12=0.0,   bs12_dVb=0.0,   bs12_dVd =0.0,  bs12_dVg =0.0, bs12_dT =0.0 ;
   double Qbmm=0.0,   Qbmm_dVb=0.0,   Qbmm_dVd =0.0,  Qbmm_dVg =0.0, Qbmm_dT =0.0 ;
   double dqb=0.0,    dqb_dVb=0.0,    dqb_dVg=0.0,    dqb_dVd =0.0,  dqb_dT =0.0 ;
-  double Vdx=0.0,    Vdx_dVbs=0.0,   Vdx_dT=0.0 ;
-  double Vdx2=0.0,   Vdx2_dVbs=0.0,  Vdx2_dT=0.0 ;    
+  double Vdx=0.0,    Vdx_dVbs=0.0;/*,   Vdx_dT=0.0 ;*/
+  double Vdx2=0.0,   Vdx2_dVbs=0.0;/*,  Vdx2_dT=0.0 ;*/    
   double Pbsum=0.0,  Pbsum_dVb=0.0,  Pbsum_dVd=0.0,  Pbsum_dVg =0.0,  Pbsum_dT =0.0 ;
   double sqrt_Pbsum =0.0 ;
   /* Poly-Depletion Effect */
@@ -709,6 +710,7 @@ int HSMHVevaluate
   /* PART-4 (junction diode) */
   double Ibs =0.0, Gbs =0.0, Gbse =0.0, Ibs_dT =0.0 ;
   double Ibd =0.0, Gbd =0.0, Gbde =0.0, Ibd_dT =0.0 ;
+/*  double Nvtm =0.0 ;*/
   /* junction capacitance */
   double Qbs =0.0, Capbs =0.0, Capbse =0.0, Qbs_dT =0.0 ;
   double Qbd =0.0, Capbd =0.0, Capbde =0.0, Qbd_dT =0.0 ;
@@ -777,9 +779,9 @@ int HSMHVevaluate
   double Qovs =0.0,    Qovs_dVbs =0.0,     Qovs_dVds =0.0,     Qovs_dVgs =0.0,     Qovs_dT =0.0 ;
   double QbuLD =0.0,   QbuLD_dVbs =0.0,    QbuLD_dVds =0.0,    QbuLD_dVgs =0.0,    QbuLD_dT =0.0 ;
   double QbdLD =0.0,   QbdLD_dVbs =0.0,    QbdLD_dVds =0.0,    QbdLD_dVgs =0.0,    QbdLD_dT =0.0 ;
-  double QbsLD =0.0,   QbsLD_dVbs =0.0,    QbsLD_dVds =0.0,    QbsLD_dVgs =0.0,    QbsLD_dT =0.0 ;
+  double QbsLD =0.0;/*,   QbsLD_dVbs =0.0,    QbsLD_dVds =0.0,    QbsLD_dVgs =0.0,    QbsLD_dT =0.0 ;*/
   double QbdLDext =0.0, QbdLDext_dVbse =0.0, QbdLDext_dVdse =0.0, QbdLDext_dVgse =0.0, QbdLDext_dT =0.0 ;
-  double QbsLDext =0.0, QbsLDext_dVbse =0.0, QbsLDext_dVdse =0.0, QbsLDext_dVgse =0.0, QbsLDext_dT =0.0 ;
+  double QbsLDext =0.0;/*, QbsLDext_dVbse =0.0, QbsLDext_dVdse =0.0, QbsLDext_dVgse =0.0, QbsLDext_dT =0.0 ;*/
 
   /* Vgsz for SCE and PGD */
   double dmpacc =0.0,  dmpacc_dVbs =0.0,   dmpacc_dVds =0.0,   dmpacc_dVgs =0.0 ;
@@ -812,7 +814,7 @@ int HSMHVevaluate
   double Ra_alpha,     Ra_beta ;
 
   /* modified external biases for symmetry */
-  double Vzadd_ext_dVd = 0.0 ;
+  double /*Vzadd_ext = 0.0,*/ Vzadd_ext_dVd = 0.0 ;
   double Vdserevz = 0.0, Vdserevz_dVd = 0.0 ;
   double Vgserevz = 0.0, Vgserevz_dVd = 0.0 ;
   double Vbserevz = 0.0, Vbserevz_dVd = 0.0 ;
@@ -831,7 +833,7 @@ int HSMHVevaluate
 
   /* temperature-dependent variables for SHE model */
   double TTEMP =0.0, TTEMP0 =0.0 ;
-  double Tdiff0 = 0.0, Tdiff0_2 = 0.0, Tdiff = 0.0, Tdiff_2 = 0.0 ;
+  double/* Tdiff0 = 0.0, Tdiff0_2 = 0.0,*/ Tdiff = 0.0, Tdiff_2 = 0.0 ;
   double Eg =0.0,    Eg_dT =0.0 ;
   double Nin =0.0,   Nin_dT =0.0 ;
   double js =0.0,    js_dT =0.0 ;
@@ -848,14 +850,14 @@ int HSMHVevaluate
 
   double QsuLD =0.0, QsuLD_dVbs =0.0, QsuLD_dVds =0.0, QsuLD_dVgs =0.0, QsuLD_dT =0.0 ;
   double QiuLD =0.0, QiuLD_dVbs =0.0, QiuLD_dVds =0.0, QiuLD_dVgs =0.0, QiuLD_dT =0.0 ;
-  double QidLD =0.0, QidLD_dVbs =0.0, QidLD_dVds =0.0, QidLD_dVgs =0.0, QidLD_dT =0.0 ;
-  double QisLD =0.0, QisLD_dVbs =0.0, QisLD_dVds =0.0, QisLD_dVgs =0.0, QisLD_dT =0.0 ;
-  double QidLDext =0.0, QidLDext_dVbse =0.0, QidLDext_dVdse =0.0, QidLDext_dVgse =0.0, QidLDext_dT =0.0 ;
-  double QisLDext =0.0, QisLDext_dVbse =0.0, QisLDext_dVdse =0.0, QisLDext_dVgse =0.0, QisLDext_dT =0.0 ;
+  double /*QidLD =0.0,*/ QidLD_dVbs =0.0, QidLD_dVds =0.0, QidLD_dVgs =0.0, QidLD_dT =0.0 ;
+  double /*QisLD =0.0,*/ QisLD_dVbs =0.0, QisLD_dVds =0.0, QisLD_dVgs =0.0, QisLD_dT =0.0 ;
+  double /*QidLDext =0.0,*/ QidLDext_dVbse =0.0, QidLDext_dVdse =0.0, QidLDext_dVgse =0.0, QidLDext_dT =0.0 ;
+  double /*QisLDext =0.0,*/ QisLDext_dVbse =0.0, QisLDext_dVdse =0.0, QisLDext_dVgse =0.0, QisLDext_dT =0.0 ;
 
   /* Self heating */
   double mphn0_dT =0.0 ;
-  double ps0ldinib_dT =0.0,  cnst0over_dT =0.0 ;
+  double ps0ldinib_dT =0.0, cnst0over_dT =0.0 ;
   double ps0ldinibs_dT =0.0, cnst0overs_dT =0.0 ;
   double Temp_dif =0.0 ;
   /* for SCE */
@@ -867,7 +869,7 @@ int HSMHVevaluate
   /* Qover */
   int flg_ovzone = 0 ;
   double VgpLD =0.0,     VgpLD_dVgb =0.0 ;
-  double Vgb_fb_LD =0.0 ;
+  double /*VthLD =0.0,*/ Vgb_fb_LD =0.0 ;
   double Ac31_dVgb =0.0, Ac31_dVxb =0.0 ;
   double Ac1_dVgb =0.0, Ac1_dVxb =0.0 ;
   double Ac2_dVgb =0.0, Ac2_dVxb =0.0 ;
@@ -878,11 +880,11 @@ int HSMHVevaluate
   double Psa_dVgb =0.0, Psa_dVxb =0.0 ;
   double QsuLD_dVgb =0.0, QsuLD_dVxb =0.0 ;
   double QbuLD_dVgb =0.0, QbuLD_dVxb =0.0 ;
-  double fs02_dVgb =0.0, fs02_dVxb =0.0 ;
+  double fs02_dVgb =0.0 ;/*, fs02_dVxb =0.0 ;*/
   double TX_dVgb =0.0, TX_dVxb =0.0 ;
   double TY_dVgb =0.0, TY_dVxb =0.0 ;
   double Ps0LD =0.0,   Ps0LD_dVgb =0.0, Ps0LD_dVxb =0.0, Ps0LD_dT =0.0 ;
-  double Ps0LD_dVbs =0.0, Ps0LD_dVds =0.0, Ps0LD_dVgs =0.0 ;
+  double /*Ps0LD_dVbs =0.0,*/ Ps0LD_dVds =0.0; /*Ps0LD_dVgs =0.0 ;*/
   double Pb2over =0.0,                                   Pb2over_dT =0.0 ;
 
   int flg_overgiven =0 ;
@@ -890,7 +892,7 @@ int HSMHVevaluate
   double Lovers =0.0, Loverd =0.0 ;
   double Novers =0.0, Noverd =0.0 ;
   double Nover_func =0.0 ;
-  double ps0ldinib_func =0.0, ps0ldinib_func_dT =0.0 ;
+/*  double ps0ldinib_func =0.0, ps0ldinib_func_dT =0.0 ;*/
   double cnst0over_func =0.0, cnst0over_func_dT =0.0 ;
   double cnst1over =0.0, cnst1over_dT =0.0;
   /* Qover Analytical Model */
@@ -903,15 +905,17 @@ int HSMHVevaluate
   double Tp,                   Tp_dT ; 
   double Tq, Tq_dVxb, Tq_dVgb, Tq_dT ;
   double     T1_dVxb, T1_dVgb ;
+/*  double     T2_dVxb, T2_dVgb ;*/
+/*  double     T3_dVxb, T3_dVgb ;*/
   double     T5_dVxb, T5_dVgb ;
   double VgpLD_shift, VgpLD_shift_dT ;
   double VgpLD_shift_dVgb, VgpLD_shift_dVxb, exp_bVbs_dVxb ;
   double gamma, gamma_dVxb, gamma_dT ;
   double psi  , psi_dVgb  , psi_dVxb  , psi_dT ;
-  double psi_B, arg_B ;
+/*  double psi_B, arg_B ;*/
   double Chi_1, Chi_1_dVgb, Chi_1_dVxb ,Chi_1_dT ;
   double Chi_A, Chi_A_dVgb, Chi_A_dVxb, Chi_A_dT ;
-  double Chi_B, Chi_B_dVgb, Chi_B_dVxb, Chi_B_dT;
+  double Chi_B, Chi_B_dVgb, Chi_B_dVxb, Chi_B_dT;/*, Chi_B_dpsi , Chi_B_dgamma ;*/
 
   /* X_dT for leakage currents & junction diodes */
   double isbd_dT =0.0,      isbs_dT =0.0 ;
@@ -965,7 +969,7 @@ int HSMHVevaluate
   /*-----------------------------------------------------------*
    * Start of the routine. (label)
    *-----------------*/
-/*start_of_routine:*/
+/* start_of_routine: */
 
   /*-----------------------------------------------------------*
    * Temperature dependent constants. 
@@ -1780,7 +1784,7 @@ int HSMHVevaluate
       dqb_dVb = Vthp_dVb - Qbmm_dVb * Cox_inv - Qbmm * Cox_inv_dVb ;
       dqb_dVd = Vthp_dVd - Qbmm_dVd * Cox_inv - Qbmm * Cox_inv_dVd ;
       dqb_dVg = Vthp_dVg - Qbmm_dVg * Cox_inv - Qbmm * Cox_inv_dVg ;
-      dqb_dT = Vthp_dT - Qbmm_dT * Cox_inv - Qbmm * Cox_inv_dT ;
+      dqb_dT  = Qb0_dT  * Cox_inv + Qb0 * Cox_inv_dT - Qbmm_dT * Cox_inv - Qbmm * Cox_inv_dT ;
 
       T1 = 2.0 * C_QE * here->HSMHV_nsubc * C_ESI ;
       T2 = sqrt( T1 * ( Pb2c - Vbsz2 ) ) ;
@@ -1814,10 +1818,10 @@ int HSMHVevaluate
 
       Vdx = model->HSMHV_scp21 + Vdsz ;
       Vdx_dVbs = Vdsz_dVbs ;
-      Vdx_dT = Vdsz_dT ;
+/*      Vdx_dT = Vdsz_dT ;*/
       Vdx2 = Vdx * Vdx ;
       Vdx2_dVbs = 2 * Vdx_dVbs * Vdx ;
-      Vdx2_dT = 2 * Vdx_dT * Vdx ;
+/*      Vdx2_dT = 2 * Vdx_dT * Vdx ;*/
       
       dVthLP = T1 * dVth0 * T3 + dqb - here->HSMHV_msc / Vdx2 ;
       dVthLP_dVb = T1_dVb * dVth0 * T3 + T1 * dVth0_dVb * T3 +  T1 * dVth0 * T3_dVb 
@@ -2118,6 +2122,7 @@ int HSMHVevaluate
       Vgp_dT += Vfbsft_dT ;
    
     }
+
 
     /*-----------------------------------------------------------*
      * Accumulation zone. (zone-A)
@@ -2820,7 +2825,7 @@ int HSMHVevaluate
     /*-----------------------------------------------------------*
      * Start point of Psl (= Ps0 + Pds) calculation. (label)
      *-----------------*/
-/*  start_of_Psl:*/
+/*  start_of_Psl: */
 
 
     /* Vdseff (begin) */
@@ -2831,6 +2836,7 @@ int HSMHVevaluate
     T2_dVb = T4 * Cox_dVb ;
     T2_dVd = T4 * Cox_dVd ;
     T2_dVg = T4 * Cox_dVg ;
+    T2_dT  = T4 * Cox_dT  ;
 
     T0 = Vgp - beta_inv - Vbsz ;
     T0_dT = Vgp_dT - beta_inv_dT - Vbsz_dT ;
@@ -2844,20 +2850,21 @@ int HSMHVevaluate
     T3_dVb = - T2_dVb * T7 + T8 * ( Vgp_dVbs - Vbsz_dVbs ) ;
     T3_dVd = - T2_dVd * T7 + T8 * ( Vgp_dVds - Vbsz_dVds ) ;
     T3_dVg = - T2_dVg * T7 + T8 * Vgp_dVgs ;
-    T3_dT = T0_dT / ( T2 * T3 ) ;
+    T3_dT  = - T2_dT  * T7 + T8 * T0_dT ;
 
     T10 = Vgp + T2 * ( 1.0e0 - T3 ) ; 
     T10_dVb = Vgp_dVbs + T2_dVb * ( 1.0e0 - T3 ) - T2 * T3_dVb ;
     T10_dVd = Vgp_dVds + T2_dVd * ( 1.0e0 - T3 ) - T2 * T3_dVd ;
     T10_dVg = Vgp_dVgs + T2_dVg * ( 1.0e0 - T3 ) - T2 * T3_dVg ;
-    T10_dT = Vgp_dT - T2 * T3_dT ;
+    T10_dT  = Vgp_dT   + T2_dT  * ( 1.0e0 - T3 ) - T2 * T3_dT ;
     Fn_SZ( T10 , T10 , 0.01 , T0 ) ;
+    T10 += epsm10 ;
     T10_dVb *= T0 ;
     T10_dVd *= T0 ;
     T10_dVg *= T0 ;
     T10_dT *=  T0 ;
 
-    T1 = Vds / T10 + small ;
+    T1 = Vds / T10 ;
     T2 = Fn_Pow( T1 , here->HSMHV_ddlt - 1.0e0 ) ;
     T7 = T2 * T1 ;
     T0 = here->HSMHV_ddlt * T2 / ( T10 * T10 ) ;
@@ -3946,7 +3953,7 @@ start_of_mobility:
       T0_dVg = Ra_dVgs * Ids0 + Ra * Ids0_dVgs ;
       T0_dT  =                  Ra * Ids0_dT ;
 
-      T1 = Vds + small ;
+      T1 = Vds + small2 ;
       T2 = 1.0 / T1 ;
       T3 = 1.0 + T0 * T2 ;
       T3_dVb = T0_dVb * T2 ;
@@ -4019,7 +4026,7 @@ start_of_mobility:
       dVthSCSTI_dVb = dVth0_dVb * T1 + dVth0 * T6 * Vdsz_dVbs ;
       dVthSCSTI_dVd = dVth0_dVd * T1 + dVth0 * T6 * Vdsz_dVds ;
       dVthSCSTI_dVg = dVth0_dVg * T1 ;
-      dVthSCSTI_dT = dVth0_dT * T1 ;
+      dVthSCSTI_dT  = dVth0_dT * T1  + dVth0 * T6 * Vdsz_dT ;
 
       T1 = pParam->HSMHV_vthsti - model->HSMHV_vdsti * Vds ;
       T1_dVd = - model->HSMHV_vdsti ;
@@ -4028,7 +4035,7 @@ start_of_mobility:
       Vgssti_dVbs = Vgsz_dVbs + dVthSCSTI_dVb ;
       Vgssti_dVds = Vgsz_dVds + T1_dVd + dVthSCSTI_dVd ;
       Vgssti_dVgs = Vgsz_dVgs + dVthSCSTI_dVg ;
-      Vgssti_dT = dVthSCSTI_dT ;
+      Vgssti_dT   = Vgsz_dT   + dVthSCSTI_dT ;
       
       costi0 = here->HSMHV_costi0 ;
       costi1 = here->HSMHV_costi1 ;
@@ -4043,7 +4050,7 @@ start_of_mobility:
       costi3_dVb_c3 = costi3_dVb * T2 ;
       costi3_dVd_c3 = costi3_dVd * T2 ;
       costi3_dVg_c3 = costi3_dVg * T2 ;
-      costi3_dT_c3 = costi3_dT * T2 ;
+/*      costi3_dT_c3 = costi3_dT * T2 ;*/
 
       costi4 = costi3 * beta * 0.5 ;
       costi4_dT = ( costi3_dT * beta + costi3 * beta_dT ) * 0.5 ;
@@ -4073,7 +4080,7 @@ start_of_mobility:
       T3_dVg = T10_dVg + 0.5 * (T1_dVg + (T1 * T1_dVg + T0 * 2.0 * T10_dVg * psisti_dlt) / T2) 
         + dVthSCSTI_dVg ;
       T3_dT = T10_dT + 0.5 * (T1_dT + (T1 * T1_dT + T0 * 2.0 * T10_dT * psisti_dlt) / T2) 
-        + dVthSCSTI_dT ;
+        + dVthSCSTI_dT  - Vbsz_dT ;
 
       T4 = beta * T3 - 1.0 ;
       T4_dT = beta_dT * T3 + beta * T3_dT ; 
@@ -4147,7 +4154,7 @@ start_of_mobility:
       T1_dVb = beta * ((Psti_dVbs - Vbsz_dVbs) + T0 * Psti_dVbs) ;
       T1_dVd = beta * ((Psti_dVds - Vbsz_dVds) + T0 * Psti_dVds) ;
       T1_dVg = beta * (Psti_dVgs + T0 * Psti_dVgs) ;
-      T1_dT = beta_dT * (Psti - Vbsz) + beta * Psti_dT + T0_dT ;
+      T1_dT = beta_dT * (Psti - Vbsz) + beta * (Psti_dT - Vbsz_dT) + T0_dT ;
       Fn_SZ ( T1 , T1, 1.0e-2, T0) ;
           T1 += epsm10 ;
       T1_dVb *= T0 ;
@@ -4165,7 +4172,7 @@ start_of_mobility:
       T1_dVb = beta * (Psti_dVbs - Vbsz_dVbs) ;
       T1_dVd = beta * (Psti_dVds - Vbsz_dVds) ;
       T1_dVg = beta * Psti_dVgs ;
-      T1_dT = beta_dT * ( Psti - Vbsz ) + beta * Psti_dT ;
+      T1_dT = beta_dT * ( Psti - Vbsz ) + beta * (Psti_dT - Vbsz_dT) ;
       Fn_SZ( T1 , T1, 1.0e-2, T0) ;
           T1 += epsm10 ;
       T1_dVb *= T0 ;
@@ -4335,6 +4342,7 @@ start_of_mobility:
       T1_dVd = T0 * Vgp_dVds ;
       T1_dVg = T0 * Vgp_dVgs ;
       T1_dVb = T0 * Vgp_dVbs ;
+      T1_dT  = T0 * Vgp_dT   ;
 
       T7 = Cox0 * Cox0 ;
       T8 = here->HSMHV_qnsub_esi ;
@@ -4348,7 +4356,7 @@ start_of_mobility:
       T5_dVd = T1_dVd - T2 * Vbsz_dVds;
       T5_dVg = T1_dVg ;
       T5_dVb = T1_dVb - T2 * Vbsz_dVbs;
-      T5_dT = - beta_inv_dT ;
+      T5_dT  = - beta_inv_dT + T1_dT  - T2 * Vbsz_dT ;
 
       T6 = T4 * T5 ;
       T6_dVd = T4 * T5_dVd ;
@@ -4372,7 +4380,7 @@ start_of_mobility:
       Psislsat_dVd = T1_dVd - T3 * T6_dVd ;
       Psislsat_dVg = T1_dVg - T3 * T6_dVg ;
       Psislsat_dVb = T1_dVb - T3 * T6_dVb ;
-      Psislsat_dT = -T3 * T6_dT ;
+      Psislsat_dT  = T1_dT  - T3 * T6_dT ;
 
       T2 = here->HSMHV_lgate / (here->HSMHV_xgate + here->HSMHV_lgate) ;
 
@@ -4380,7 +4388,7 @@ start_of_mobility:
       Psisubsat_dVd = pParam->HSMHV_svds * Vdsz_dVds + Ps0z_dVds - T2 * Psislsat_dVd ; 
       Psisubsat_dVg = Ps0z_dVgs - T2 * Psislsat_dVg ; 
       Psisubsat_dVb =  pParam->HSMHV_svds * Vdsz_dVbs + Ps0z_dVbs - T2 * Psislsat_dVb ;
-      Psisubsat_dT = Ps0z_dT - T2 * Psislsat_dT ;
+      Psisubsat_dT  =  pParam->HSMHV_svds * Vdsz_dT   + Ps0z_dT   - T2 * Psislsat_dT  ;
       Fn_SZ( Psisubsat , Psisubsat, 1.0e-3, T9 ) ; 
       Psisubsat += small ;
       Psisubsat_dVd *= T9 ;
@@ -4480,7 +4488,7 @@ start_of_mobility:
     dVbsIBPC_dVbs = pParam->HSMHV_ibpc1 * ( pParam->HSMHV_ibpc2 * dVth_dVb * Isub + T0 * Isub_dVbs ) ;
     dVbsIBPC_dVds = pParam->HSMHV_ibpc1 * ( pParam->HSMHV_ibpc2 * dVth_dVd * Isub + T0 * Isub_dVds ) ;
     dVbsIBPC_dVgs = pParam->HSMHV_ibpc1 * ( pParam->HSMHV_ibpc2 * dVth_dVg * Isub + T0 * Isub_dVgs ) ;
-    dVbsIBPC_dT = pParam->HSMHV_ibpc1 * T0 * Isub_dT ;
+    dVbsIBPC_dT = pParam->HSMHV_ibpc1 * ( pParam->HSMHV_ibpc2 * dVth_dT * Isub + T0 * Isub_dT ) ;
 
     /* dG3 & dG4 */
     T10 = 1e0 / Xi0 ;
@@ -4556,7 +4564,7 @@ start_of_mobility:
       T1_dVg = Vgsz_dVgs + T3 * (dVth_dVg - dPpg_dVg) - Psdlz_dVgs * pParam->HSMHV_gleak3 ;
       T1_dVd = Vgsz_dVds + T3 * (dVth_dVd - dPpg_dVd)  - Psdlz_dVds * pParam->HSMHV_gleak3 ;
       T1_dVb = Vgsz_dVbs + T3 * ( dVth_dVb - dPpg_dVb )  - Psdlz_dVbs * pParam->HSMHV_gleak3 ;
-      T1_dT = T3 * ( dVth_dT - dPpg_dT )  - Psdlz_dT * pParam->HSMHV_gleak3 ;
+      T1_dT  = Vgsz_dT   + T3 * ( dVth_dT - dPpg_dT )  - Psdlz_dT * pParam->HSMHV_gleak3 ;
 
       T3 = 2.0 * T1 ;
       T1_dVg = T3 * T1_dVg ;
@@ -4742,7 +4750,7 @@ start_of_mobility:
                    ) / Tox0 ;
       T2_dVb = - ( pParam->HSMHV_fvbs * Vbsz_dVbs -Vgsz_dVbs + dVthSC_dVb + dVthLP_dVb 
                    ) / Tox0 ;
-      T2_dT = - ( dVthSC_dT + dVthLP_dT 
+      T2_dT = - (  pParam->HSMHV_fvbs * Vbsz_dT   -Vgsz_dT   + dVthSC_dT + dVthLP_dT
                    ) / Tox0 ;
 
       T0 = T2 * T2 ;
@@ -4822,7 +4830,7 @@ start_of_mobility:
 
     T3 = 1 / (Egidl + small) ;
     T0 = - pParam->HSMHV_gidl2 * Egp32 * T3 ;
-    T0_dT = - pParam->HSMHV_gidl2 * T3 *( Egp32_dT - Egidl_dT * T3 )  ;
+    T0_dT = - pParam->HSMHV_gidl2 * T3 *( Egp32_dT - Egidl_dT * T3 * Egp32 )  ;
     if ( T0 < - EXP_THR ) {
       Igidl = 0.0 ;
       Igidl_dVbs = Igidl_dVds = Igidl_dVgs = Igidl_dT = 0.0 ;
@@ -4836,7 +4844,7 @@ start_of_mobility:
       Igidl_dVbs = T3 * Egidl_dVb ;
       Igidl_dVds = T3 * Egidl_dVd ;
       Igidl_dVgs = T3 * Egidl_dVg ;
-      Igidl_dT = T3 * Egidl_dT  +  T2 * Egidl * Egidl * T1_dT + T2_dT * Egidl * Egidl * T1;
+      Igidl_dT = T2 * T1 * Egidl * 2.0 * Egidl_dT  +  T2 * Egidl * Egidl * T1_dT + T2_dT * Egidl * Egidl * T1;
     }
     
     /* bug-fix */
@@ -4888,7 +4896,7 @@ start_of_mobility:
 
     T3 =  1  / (Egisl + small) ;
     T0 = - pParam->HSMHV_gidl2 * Egp32 * T3 ;
-    T0_dT = - pParam->HSMHV_gidl2 * T3 * ( Egp32_dT - Egisl_dT * T3 )  ;
+    T0_dT = - pParam->HSMHV_gidl2 * T3 * ( Egp32_dT - Egisl_dT * T3 * Egp32 )  ;
     if ( T0 < - EXP_THR ) {
       Igisl = 0.0 ;
       Igisl_dVbs = Igisl_dVds = Igisl_dVgs = Igisl_dT = 0.0 ;
@@ -4903,7 +4911,7 @@ start_of_mobility:
       Igisl_dVbs = T3 * Egisl_dVb ;
       Igisl_dVds = T3 * Egisl_dVd ;
       Igisl_dVgs = T3 * Egisl_dVg ;
-      Igisl_dT = T3 * Egisl_dT + T2_dT * Egisl * Egisl * T1 + T2 * Egisl * Egisl * T1_dT ;
+      Igisl_dT = T2 * T1 * Egisl * 2.0 * Egisl_dT + T2_dT * Egisl * Egisl * T1 + T2 * Egisl * Egisl * T1_dT ;
     }
 
     /* bug-fix */
@@ -5049,9 +5057,8 @@ start_of_mobility:
     Nover_func = Novers ;
     cnst0over_func =    ModeNML * here->HSMHV_cnst0overs + ModeRVS * here->HSMHV_cnst0over ;
     cnst0over_func_dT = ModeNML * cnst0overs_dT         + ModeRVS * cnst0over_dT ;
-    ps0ldinib_func =    ModeNML * here->HSMHV_ps0ldinibs + ModeRVS * here->HSMHV_ps0ldinib ;
-    ps0ldinib_func_dT = ModeNML * ps0ldinibs_dT         + ModeRVS * ps0ldinib_dT ;
-
+/*    ps0ldinib_func =    ModeNML * here->HSMHV_ps0ldinibs + ModeRVS * here->HSMHV_ps0ldinib ;*/
+/*    ps0ldinib_func_dT = ModeNML * ps0ldinibs_dT         + ModeRVS * ps0ldinib_dT ;*/
 #include "hsmhveval_qover.h"
 
     T4 = here->HSMHV_weffcv_nf * Lovers * ( 1 - CVDSOVER ) ;
@@ -5062,18 +5069,18 @@ start_of_mobility:
     Qovs_dVbs = T4 * QsuLD_dVbs ;
     Qovs_dT  = T4 * QsuLD_dT ;
   
-    QisLD = T4 * QiuLD ;
+/*    QisLD = T4 * QiuLD ;*/
     QisLD_dVbs = T4 * QiuLD_dVbs ;
     QisLD_dVds = T4 * QiuLD_dVds ;
     QisLD_dVgs = T4 * QiuLD_dVgs ;
     QisLD_dT = T4 * QiuLD_dT ; 
   
     QbsLD = T4 * QbuLD ;
-    QbsLD_dVbs = T4 * QbuLD_dVbs ;
+/*    QbsLD_dVbs = T4 * QbuLD_dVbs ;
     QbsLD_dVds = T4 * QbuLD_dVds ;
     QbsLD_dVgs = T4 * QbuLD_dVgs ;
     QbsLD_dT = T4 * QbuLD_dT ; 
-  
+*/
 
 
     if ( CVDSOVER != 0.0 ) { /* Qovsext begin */
@@ -5095,18 +5102,18 @@ start_of_mobility:
       Qovsext_dVbse = T4 * QsuLD_dVbs ;
       Qovsext_dT   = T4 * QsuLD_dT ;
       
-      QisLDext = T4 * QiuLD ;
+/*      QisLDext = T4 * QiuLD ;*/
       QisLDext_dVbse = T4 * QiuLD_dVbs ;
       QisLDext_dVdse = T4 * QiuLD_dVds ;
       QisLDext_dVgse = T4 * QiuLD_dVgs ;
       QisLDext_dT = T4 * QiuLD_dT ; 
   
       QbsLDext = T4 * QbuLD ;
-      QbsLDext_dVbse = T4 * QbuLD_dVbs ;
+/*      QbsLDext_dVbse = T4 * QbuLD_dVbs ;
       QbsLDext_dVdse = T4 * QbuLD_dVds ;
       QbsLDext_dVgse = T4 * QbuLD_dVgs ;
       QbsLDext_dT = T4 * QbuLD_dT ; 
-      
+*/      
     } /* Qovsext end */
 
   } 
@@ -5184,9 +5191,8 @@ start_of_mobility:
     Nover_func = Noverd ;
     cnst0over_func =    ModeNML * here->HSMHV_cnst0over + ModeRVS * here->HSMHV_cnst0overs ;
     cnst0over_func_dT = ModeNML * cnst0over_dT         + ModeRVS * cnst0overs_dT ;
-    ps0ldinib_func =    ModeNML * here->HSMHV_ps0ldinib + ModeRVS * here->HSMHV_ps0ldinibs ;
-    ps0ldinib_func_dT = ModeNML * ps0ldinib_dT         + ModeRVS * ps0ldinibs_dT ;
-
+/*    ps0ldinib_func =    ModeNML * here->HSMHV_ps0ldinib + ModeRVS * here->HSMHV_ps0ldinibs ;*/
+/*    ps0ldinib_func_dT = ModeNML * ps0ldinib_dT         + ModeRVS * ps0ldinibs_dT ;*/
 #include "hsmhveval_qover.h"
 
     T4 = here->HSMHV_weffcv_nf * Loverd * ( 1 - CVDSOVER ) ;
@@ -5196,7 +5202,7 @@ start_of_mobility:
     Qovd_dVbs = T4 * QsuLD_dVbs ;
     Qovd_dT = T4 * QsuLD_dT ;
   
-    QidLD = T4 * QiuLD ;
+/*    QidLD = T4 * QiuLD ;*/
     QidLD_dVbs = T4 * QiuLD_dVbs ;
     QidLD_dVds = T4 * QiuLD_dVds ;
     QidLD_dVgs = T4 * QiuLD_dVgs ;
@@ -5228,7 +5234,7 @@ start_of_mobility:
       Qovdext_dVbse = T4 * QsuLD_dVbs ;
       Qovdext_dT   = T4 * QsuLD_dT ;
 
-      QidLDext = T4 * QiuLD ;
+/*      QidLDext = T4 * QiuLD ;*/
       QidLDext_dVbse = T4 * QiuLD_dVbs ;
       QidLDext_dVdse = T4 * QiuLD_dVds ;
       QidLDext_dVgse = T4 * QiuLD_dVgs ;
@@ -5315,7 +5321,7 @@ start_of_mobility:
    * End of PART-3. (label) 
    *-----------------*/ 
 
-/* end_of_part_3:*/
+/* end_of_part_3: */
 
   /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
    * PART-4: Substrate-source/drain junction diode.
@@ -5730,7 +5736,7 @@ start_of_mobility:
    * End of PART-4. (label) 
    *-----------------*/ 
 
-/* end_of_part_4:*/
+/* end_of_part_4: */
 
   
 
@@ -5843,7 +5849,7 @@ start_of_mobility:
   /*-----------------------------------------------------------* 
    * End of PART-5. (label) 
    *-----------------*/ 
-/* end_of_part_5:*/ 
+/* end_of_part_5: */
 
   /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
    * PART-6: Noise Calculation.
@@ -5934,7 +5940,7 @@ start_of_mobility:
   /*-----------------------------------------------------------* 
    * End of PART-6. (label) 
    *-----------------*/ 
-/* end_of_part_6:*/ 
+/* end_of_part_6: */
 
 
   /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
@@ -6481,7 +6487,7 @@ start_of_mobility:
     here->HSMHV_dRd_dVsubs = Rs_dVsubs / Mfactor ;
     here->HSMHV_dRd_dTi   = Rs_dT / Mfactor ;
     here->HSMHV_Rs = Rd / Mfactor ;
-    here->HSMHV_dRs_dVdse = - ( Rd_dVdse + Rd_dVgse + Rd_dVbse + Rs_dVsubs ) / Mfactor ;
+    here->HSMHV_dRs_dVdse = - ( Rd_dVdse + Rd_dVgse + Rd_dVbse + Rd_dVsubs ) / Mfactor ;
     here->HSMHV_dRs_dVgse = Rd_dVgse / Mfactor ;
     here->HSMHV_dRs_dVbse = Rd_dVbse / Mfactor ;
     here->HSMHV_dRs_dVsubs = Rd_dVsubs / Mfactor ;
@@ -6508,7 +6514,7 @@ start_of_mobility:
   /*-----------------------------------------------------------*
    * End of PART-7. (label) 
    *-----------------*/ 
-/* end_of_part_7:*/ 
+/* end_of_part_7: */
 
   /*-----------------------------------------------------------* 
    * Bottom of hsmhveval. 

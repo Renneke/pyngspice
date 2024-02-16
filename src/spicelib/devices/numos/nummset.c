@@ -35,8 +35,6 @@ NUMOSsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
   MODLcard *models;
   OPTNcard *options;
   OUTPcard *outputs;
-  char *icFileName = NULL;
-  size_t nameLen;
   int error, xIndex;
   int xMeshSize, yMeshSize;
   TWOdevice *pDevice;
@@ -50,7 +48,7 @@ NUMOSsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
   double startTime;
 
   /* loop through all the models */
-  for (; model != NULL; model = model->NUMOSnextModel) {
+  for (; model != NULL; model = NUMOSnextModel(model)) {
     if (!model->NUMOSpInfo) {
       TSCALLOC(model->NUMOSpInfo, 1, TWOtranInfo);
     }
@@ -162,8 +160,8 @@ NUMOSsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
     model->NUMOSdopTables = dopTableList;
 
     /* loop through all the instances of the model */
-    for (inst = model->NUMOSinstances; inst != NULL;
-	inst = inst->NUMOSnextInstance) {
+    for (inst = NUMOSinstances(model); inst != NULL;
+         inst = NUMOSnextInstance(inst)) {
 
       startTime = SPfrontEnd->IFseconds();
 
@@ -174,16 +172,9 @@ NUMOSsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
       }
       if (!inst->NUMOSicFileGiven) {
 	if (options->OPTNunique) {
-	  nameLen = strlen(options->OPTNicFile) + strlen(inst->NUMOSname) + 1;
-	  TSCALLOC(icFileName, nameLen+1, char);
-	  sprintf(icFileName, "%s.%s", options->OPTNicFile, inst->NUMOSname);
-	  icFileName[nameLen] = '\0';
-          inst->NUMOSicFile = icFileName;
+	  inst->NUMOSicFile = tprintf("%s.%s", options->OPTNicFile, inst->NUMOSname);
 	} else if (options->OPTNicFile != NULL) {
-	  nameLen = strlen(options->OPTNicFile);
-	  TSCALLOC(icFileName, nameLen+1, char);
-	  icFileName = strcpy(icFileName, options->OPTNicFile);
-	  inst->NUMOSicFile = icFileName;
+	  inst->NUMOSicFile = tprintf("%s", options->OPTNicFile);
 	} else {
 	  inst->NUMOSicFile = NULL;
 	}
@@ -219,7 +210,7 @@ NUMOSsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
 	    pMaterial = pMaterial->next;
 	  }
 	  /* Copy everything, then fix the incorrect pointer. */
-	  bcopy(pM, pMaterial, sizeof(TWOmaterial));
+	  memcpy(pMaterial, pM, sizeof(TWOmaterial));
 	  pMaterial->next = NULL;
 	}
 
@@ -233,7 +224,7 @@ NUMOSsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
       TWOgetStatePointers(inst->NUMOSpDevice, states);
 
       /* Wipe out statistics from previous runs (if any). */
-      bzero(inst->NUMOSpDevice->pStats, sizeof(TWOstats));
+      memset(inst->NUMOSpDevice->pStats, 0, sizeof(TWOstats));
 
       inst->NUMOSpDevice->pStats->totalTime[STAT_SETUP] +=
 	  SPfrontEnd->IFseconds() - startTime;

@@ -16,25 +16,22 @@ int
 RESload(GENmodel *inModel, CKTcircuit *ckt)
 {
     RESmodel *model = (RESmodel *)inModel;
-    double m;
 
     /*  loop through all the resistor models */
-    for( ; model != NULL; model = model->RESnextModel ) {
+    for( ; model != NULL; model = RESnextModel(model)) {
         RESinstance *here;
 
         /* loop through all the instances of the model */
-        for (here = model->RESinstances; here != NULL ;
-                here = here->RESnextInstance) {
+        for (here = RESinstances(model); here != NULL ;
+                here = RESnextInstance(here)) {
 
             here->REScurrent = (*(ckt->CKTrhsOld+here->RESposNode) -
                                 *(ckt->CKTrhsOld+here->RESnegNode)) * here->RESconduct;
 
-            m = (here->RESm);
-
-            *(here->RESposPosptr) += m * here->RESconduct;
-            *(here->RESnegNegptr) += m * here->RESconduct;
-            *(here->RESposNegptr) -= m * here->RESconduct;
-            *(here->RESnegPosptr) -= m * here->RESconduct;
+            *(here->RESposPosPtr) += here->RESconduct;
+            *(here->RESnegNegPtr) += here->RESconduct;
+            *(here->RESposNegPtr) -= here->RESconduct;
+            *(here->RESnegPosPtr) -= here->RESconduct;
         }
     }
     return(OK);
@@ -47,31 +44,27 @@ int
 RESacload(GENmodel *inModel, CKTcircuit *ckt)
 {
     RESmodel *model = (RESmodel *)inModel;
-    double m;
+    double g;
 
     NG_IGNORE(ckt);
 
     /*  loop through all the resistor models */
-    for( ; model != NULL; model = model->RESnextModel ) {
+    for( ; model != NULL; model = RESnextModel(model)) {
         RESinstance *here;
 
         /* loop through all the instances of the model */
-        for (here = model->RESinstances; here != NULL ;
-             here = here->RESnextInstance) {
+        for (here = RESinstances(model); here != NULL ;
+             here = RESnextInstance(here)) {
 
-            m = (here->RESm);
+            if (here->RESacresGiven)
+                g = here->RESacConduct;
+            else
+                g = here->RESconduct;
 
-            if(here->RESacresGiven) {
-                *(here->RESposPosptr) += m * here->RESacConduct;
-                *(here->RESnegNegptr) += m * here->RESacConduct;
-                *(here->RESposNegptr) -= m * here->RESacConduct;
-                *(here->RESnegPosptr) -= m * here->RESacConduct;
-            } else {
-                *(here->RESposPosptr) += m * here->RESconduct;
-                *(here->RESnegNegptr) += m * here->RESconduct;
-                *(here->RESposNegptr) -= m * here->RESconduct;
-                *(here->RESnegPosptr) -= m * here->RESconduct;
-            }
+            *(here->RESposPosPtr) += g;
+            *(here->RESnegNegPtr) += g;
+            *(here->RESposNegPtr) -= g;
+            *(here->RESnegPosPtr) -= g;
         }
     }
     return(OK);

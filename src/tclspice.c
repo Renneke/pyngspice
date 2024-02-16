@@ -26,6 +26,7 @@
 /**********************************************************************/
 
 #include "ngspice/ngspice.h"
+#include "ngspice/randnumb.h"
 #include "misc/misc_time.h"
 #include <tcl.h>
 
@@ -136,16 +137,6 @@ typedef void (*sighandler)(int);
 #define S_IRWXU _S_IWRITE
 #endif
 
-#ifdef HAVE_ASPRINTF
-#ifdef HAVE_LIBIBERTY_H /* asprintf */
-#include <libiberty.h>
-#elif defined(__MINGW32__) || defined(__SUNPRO_C) /* we have asprintf, but not libiberty.h */
-#include <stdarg.h>
-extern int asprintf(char **out, const char *fmt, ...);
-extern int vasprintf(char **out, const char *fmt, va_list ap);
-#endif
-#endif
-
 extern IFfrontEnd nutmeginfo;
 
 extern struct comm spcp_coms[ ];
@@ -197,7 +188,7 @@ int  sp_Tk_SetColor(int colorid);
 int  sp_Tk_SetLinestyle(int linestyleid);
 int  sp_Tk_DefineLinestyle(int linestyleid, int mask);
 int  sp_Tk_DefineColor(int colorid, double red, double green, double blue);
-int  sp_Tk_Text(char *text, int x, int y);
+int  sp_Tk_Text(char *text, int x, int y, int angle);
 int  sp_Tk_Arc(int x0, int y0, int radius, double theta, double delta_theta);
 int  sp_Tk_DrawLine(int x1, int y1, int x2, int y2);
 int  sp_Tk_Clear(void);
@@ -220,7 +211,7 @@ int  blt_plot(struct dvec *y, struct dvec *x, int new);
 /*helper function*/
 /*inline*/
 static struct plot *
-get_plot(int plot)
+get_plot_by_index(int plot)
 {
     struct plot *pl;
     pl = plot_list;
@@ -302,7 +293,7 @@ spice_data TCL_CMDPROCARGS(clientData, interp, argc, argv)
     } else {
         struct plot *pl;
         struct dvec *v;
-        if (!(pl = get_plot(atoi(argv[1])))) {
+        if (!(pl = get_plot_by_index(atoi(argv[1])))) {
             Tcl_SetResult(interp, "Bad plot number", TCL_STATIC);
             return TCL_ERROR;
         }
@@ -837,10 +828,9 @@ _tcl_dispatch TCL_CMDPROCARGS(clientData, interp, argc, argv)
     int i;
     NG_IGNORE(clientData);
     save_interp();
-    /* Looks backwards through the first command and strips the :: part */
-    for (i = strlen(argv[0])-1; i > 0; i--)
-        if (argv[0][i] == *":")
-            argv[0] += i + 1;
+    char *prefix = strstr(argv[0], "spice::");
+    if (prefix)
+        argv[0] = prefix + 7;
     return _run(argc, (char **)argv);
 }
 
@@ -892,7 +882,7 @@ plot_variables TCL_CMDPROCARGS(clientData, interp, argc, argv)
 
     plot = atoi(argv[1]);
 
-    if (!(pl = get_plot(plot))) {
+    if (!(pl = get_plot_by_index(plot))) {
         Tcl_SetResult(interp, "Bad plot given", TCL_STATIC);
         return TCL_ERROR;
     }
@@ -922,7 +912,7 @@ plot_variablesInfo TCL_CMDPROCARGS(clientData, interp, argc, argv)
 
     plot = atoi(argv[1]);
 
-    if (!(pl = get_plot(plot))) {
+    if (!(pl = get_plot_by_index(plot))) {
         Tcl_SetResult(interp, "Bad plot given", TCL_STATIC);
         return TCL_ERROR;
     }
@@ -958,7 +948,7 @@ plot_get_value TCL_CMDPROCARGS(clientData, interp, argc, argv)
     plot = atoi(argv[2]);
     index = atoi(argv[3]);
 
-    if (!(pl = get_plot(plot))) {
+    if (!(pl = get_plot_by_index(plot))) {
         Tcl_SetResult(interp, "Bad plot", TCL_STATIC);
         return TCL_ERROR;
     }
@@ -994,7 +984,7 @@ plot_datapoints TCL_CMDPROCARGS(clientData, interp, argc, argv)
 
     plot = atoi(argv[1]);
 
-    if (!(pl = get_plot(plot))) {
+    if (!(pl = get_plot_by_index(plot))) {
         Tcl_SetResult(interp, "Bad plot", TCL_STATIC);
         return TCL_ERROR;
     }
@@ -1021,7 +1011,7 @@ plot_title TCL_CMDPROCARGS(clientData, interp, argc, argv)
 
     plot = atoi(argv[1]);
 
-    if (!(pl = get_plot(plot))) {
+    if (!(pl = get_plot_by_index(plot))) {
         Tcl_SetResult(interp, "Bad plot", TCL_STATIC);
         return TCL_ERROR;
     }
@@ -1044,7 +1034,7 @@ plot_date TCL_CMDPROCARGS(clientData, interp, argc, argv)
 
     plot = atoi(argv[1]);
 
-    if (!(pl = get_plot(plot))) {
+    if (!(pl = get_plot_by_index(plot))) {
         Tcl_SetResult(interp, "Bad plot", TCL_STATIC);
         return TCL_ERROR;
     }
@@ -1066,7 +1056,7 @@ plot_name TCL_CMDPROCARGS(clientData, interp, argc, argv)
 
     plot = atoi(argv[1]);
 
-    if (!(pl = get_plot(plot))) {
+    if (!(pl = get_plot_by_index(plot))) {
         Tcl_SetResult(interp, "Bad plot", TCL_STATIC);
         return TCL_ERROR;
     }
@@ -1088,7 +1078,7 @@ plot_typename TCL_CMDPROCARGS(clientData, interp, argc, argv)
 
     plot = atoi(argv[1]);
 
-    if (!(pl = get_plot(plot))) {
+    if (!(pl = get_plot_by_index(plot))) {
         Tcl_SetResult(interp, "Bad plot", TCL_STATIC);
         return TCL_ERROR;
     }
@@ -1115,7 +1105,7 @@ plot_nvars TCL_CMDPROCARGS(clientData, interp, argc, argv)
 
     plot = atoi(argv[1]);
 
-    if (!(pl = get_plot(plot))) {
+    if (!(pl = get_plot_by_index(plot))) {
         Tcl_SetResult(interp, "Bad plot", TCL_STATIC);
         return TCL_ERROR;
     }
@@ -1141,7 +1131,7 @@ plot_defaultscale TCL_CMDPROCARGS(clientData, interp, argc, argv)
 
     plot = atoi(argv[1]);
 
-    if (!(pl = get_plot(plot))) {
+    if (!(pl = get_plot_by_index(plot))) {
         Tcl_SetResult(interp, "Bad plot", TCL_STATIC);
         return TCL_ERROR;
     }
@@ -1178,7 +1168,7 @@ plot_getvector TCL_CMDPROCARGS(clientData, interp, argc, argv)
 
     plot = atoi(argv[1]);
 
-    if (!(pl = get_plot(plot))) {
+    if (!(pl = get_plot_by_index(plot))) {
         Tcl_SetResult(interp, "Bad plot", TCL_STATIC);
         return TCL_ERROR;
     }
@@ -1641,9 +1631,12 @@ sp_Tk_Arc(int x0, int y0, int radius, double theta, double delta_theta)
 
 
 int
-sp_Tk_Text(char *text, int x, int y)
+sp_Tk_Text(char *text, int x, int y, int angle)
 {
+    NG_IGNORE(angle);
+
     char buf[1024];
+    NG_IGNORE(angle);
     sprintf(buf, "spice_gr_Text \"%s\" %i %i", text, x, y);
     if (Tcl_Eval(spice_interp, buf) != TCL_OK) {
         Tcl_ResetResult(spice_interp);
@@ -2532,12 +2525,8 @@ Spice_Init(Tcl_Interp *interp)
             struct passwd *pw;
             pw = getpwuid(getuid());
 
-#ifdef HAVE_ASPRINTF
-            asprintf(&s, "%s%s", pw->pw_dir, INITSTR);
-#else
-            s = TMALLOC(char, 1 + strlen(pw->pw_dir) + strlen(INITSTR));
-            sprintf(s, "%s%s", pw->pw_dir, INITSTR);
-#endif
+            s = tprintf("%s" DIR_PATHSEP "%s", pw->pw_dir, INITSTR);
+
             if (access(s, 0) == 0)
                 inp_source(s);
         }
@@ -2670,7 +2659,11 @@ tcl_vfprintf(FILE *f, const char *fmt, va_list args)
     // assert(size > 0);
 
     for (;;) {
-        nchars = vsnprintf(p + prolog_len, size, fmt, args);
+        va_list ap;
+
+        va_copy(ap, args);
+        nchars = vsnprintf(p + prolog_len, size, fmt, ap);
+        va_end(ap);
 
         if(nchars == -1) {           /* compatibility to old implementations */
             size *= 2;

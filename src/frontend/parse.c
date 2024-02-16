@@ -16,46 +16,59 @@ Author: 1985 Wayne A. Christopher, U. C. Berkeley CAD Group
 
 #include "evaluate.h"
 #include "parse.h"
+#include "parse-bison.h"
+#include "parse-bison-y.h"
 
 
 static bool checkvalid(struct pnode *pn);
-static struct pnode *mkbnode(int opnum, struct pnode *arg1, struct pnode *arg2);
-static struct pnode *mkunode(int op, struct pnode *arg);
-static struct pnode *mkfnode(const char *func, struct pnode *arg);
-static struct pnode *mknnode(double number);
-static struct pnode *mksnode(const char *string);
 
-#include "parse-bison.c"
+#ifdef OLD_BISON
+extern int PPparse(char **, struct pnode **);
+#endif
 
 void db_print_pnode_tree(struct pnode *p, char *print);
 
 
-struct pnode *
-ft_getpnames(wordlist *wl, bool check)
+struct pnode *ft_getpnames_from_string(const char *sz, bool check)
 {
     struct pnode *pn;
-    char *xsbuf, *sbuf;
-    int rv;
 
-    if (!wl) {
-        fprintf(cp_err, "Warning: NULL arithmetic expression\n");
-        return (NULL);
+    /* The first argument to PPparse is not const char **, but it does not
+     * appear to modify the string that is being parsed */
+    if (PPparse((char **) &sz, &pn) != 0) {
+        return (struct pnode *) NULL;
     }
 
-    xsbuf = sbuf = wl_flatten(wl);
+    /* If validation is requested, do it and return NULL on failure. The
+     * structure must also be freed if the check fails since it is not
+     * being returned. */
+    if (check && !checkvalid(pn)) {
+        free_pnode(pn);
+        return (struct pnode *) NULL;
+    }
 
-    rv = PPparse(&sbuf, &pn);
+    return pn;
+} /* end of function ft_getpnames_from_string */
 
-    tfree(xsbuf);
 
-    if (rv)
-        return (NULL);
 
-    if (check && !checkvalid(pn))
-        return (NULL);
+struct pnode *
+ft_getpnames(const wordlist *wl, bool check)
+{
+    /* Validate input */
+    if (!wl) {
+        (void) fprintf(cp_err, "Warning: NULL arithmetic expression\n");
+        return (struct pnode *) NULL;
+    }
 
-    return (pn);
-}
+    /* Convert the list to a string, then parse the string */
+    const char * const sz = wl_flatten(wl);
+    struct pnode * const pn = ft_getpnames_from_string(sz, check);
+    txfree((void *) sz);
+
+    return pn; /* Return the parsed result */
+} /* end of function ft_getpnames */
+
 
 
 /* See if there are any variables around which have length 0 and are
@@ -75,7 +88,7 @@ checkvalid(struct pnode *pn)
                             pn->pn_value->v_name);
                 else
                     fprintf(cp_err,
-                            "Error(parse.c--checkvalid): %s: no such vector.\n",
+                            "Error(parse.c--checkvalid): %s: zero length vector.\n",
                             pn->pn_value->v_name);
                 return (FALSE);
             }
@@ -148,10 +161,11 @@ struct func ft_funcs[] = {
     { "re",          cx_real },
     { "imag",        cx_imag },
     { "im",          cx_imag },
+    { "conj",        cx_conj },
     { "db",          cx_db },
     { "log",         cx_log },
-    { "log10",       cx_log },
-    { "ln",          cx_ln },
+    { "log10",       cx_log10 },
+    { "ln",          cx_log },
     { "exp",         cx_exp },
     { "abs",         cx_mag },
     { "sqrt",        cx_sqrt },
@@ -170,9 +184,11 @@ struct func ft_funcs[] = {
     { "exponential", cx_exponential },
     { "sgauss",      cx_sgauss },
     { "pos",         cx_pos },
+    { "nint",        cx_nint },
     { "floor",       cx_floor },
     { "ceil",        cx_ceil },
     { "mean",        cx_mean },
+    { "stddev",      cx_stddev },
     { "avg",         cx_avg }, /* A.Roldan 03/06/05 incremental average new function */
     { "group_delay", (cx_function_t*) cx_group_delay }, /* A.Roldan 10/06/05 group delay new function */
     { "vector",      cx_vector },
@@ -197,67 +213,70 @@ struct func func_not = { "not", cx_not };
 
 
 /* Binary operator node. */
-
-static struct pnode *
-mkbnode(int opnum, struct pnode *arg1, struct pnode *arg2)
+struct pnode *PP_mkbnode(int opnum, struct pnode *arg1, struct pnode *arg2)
 {
     struct op *o;
     struct pnode *p;
 
-    for (o = &ops[0]; o->op_name; o++)
-        if (o->op_num == opnum)
+    for (o = &ops[0]; o->op_name; o++) {
+        if (o->op_num == opnum) {
             break;
+        }
+    }
 
-    if (!o->op_name)
-        fprintf(cp_err, "mkbnode: Internal Error: no such op num %d\n",
+    if (!o->op_name) {
+        fprintf(cp_err, "PP_mkbnode: Internal Error: no such op num %d\n",
                 opnum);
+    }
 
-    p = alloc(struct pnode);
-    p->pn_use = 0;
-    p->pn_value = NULL;
-    p->pn_name = NULL;  /* sjb */
-    p->pn_func = NULL;
+    p = alloc_pnode();
+
     p->pn_op = o;
+
     p->pn_left = arg1;
-    if (p->pn_left)
+    if (p->pn_left) {
         p->pn_left->pn_use++;
+    }
+
     p->pn_right = arg2;
-    if (p->pn_right)
+    if (p->pn_right) {
         p->pn_right->pn_use++;
-    p->pn_next = NULL;
-    return (p);
-}
+    }
+
+    return p;
+} /* end of function PP_mkbnode */
+
 
 
 /* Unary operator node. */
-
-static struct pnode *
-mkunode(int op, struct pnode *arg)
+struct pnode *PP_mkunode(int op, struct pnode *arg)
 {
     struct pnode *p;
     struct op *o;
 
-    p = alloc(struct pnode);
-    for (o = uops; o->op_name; o++)
-        if (o->op_num == op)
-            break;
+    p = alloc_pnode();
 
-    if (!o->op_name)
-        fprintf(cp_err, "mkunode: Internal Error: no such op num %d\n",
+    for (o = uops; o->op_name; o++) {
+        if (o->op_num == op) {
+            break;
+        }
+    }
+
+    if (!o->op_name) {
+        fprintf(cp_err, "PP_mkunode: Internal Error: no such op num %d\n",
                 op);
+    }
 
     p->pn_op = o;
-    p->pn_use = 0;
-    p->pn_value = NULL;
-    p->pn_name = NULL;  /* sjb */
-    p->pn_func = NULL;
+
     p->pn_left = arg;
-    if (p->pn_left)
+    if (p->pn_left) {
         p->pn_left->pn_use++;
-    p->pn_right = NULL;
-    p->pn_next = NULL;
-    return (p);
-}
+    }
+
+    return p;
+} /* end of function PP_mkunode */
+
 
 
 /* Function node. We have to worry about a lot of things here. Something
@@ -268,9 +287,7 @@ mkunode(int op, struct pnode *arg)
  * the arguments, and then return a copy of the expression that it was
  * defined to be.
  */
-
-static struct pnode *
-mkfnode(const char *func, struct pnode *arg)
+struct pnode *PP_mkfnode(const char *func, struct pnode *arg)
 {
     struct func *f;
     struct pnode *p, *q;
@@ -280,15 +297,22 @@ mkfnode(const char *func, struct pnode *arg)
     (void) strcpy(buf, func);
     strtolower(buf);  /* Make sure the case is ok. */
 
-    for (f = &ft_funcs[0]; f->fu_name; f++)
-        if (eq(f->fu_name, buf))
+    for (f = &ft_funcs[0]; f->fu_name; f++) {
+        if (eq(f->fu_name, buf)) {
             break;
+        }
+    }
 
-    if (f->fu_name == NULL) {
+    if (f->fu_name == NULL) { /* not found yet */
         /* Give the user-defined functions a try. */
         q = ft_substdef(func, arg);
-        if (q)
-            return (q);
+        if (q) { /* found */
+            /* remove only the old comma operator pnode, no longer used */
+            if (arg->pn_op && arg->pn_op->op_num == PT_OP_COMMA) {
+                free_pnode(arg);
+            }
+            return q;
+        }
     }
 
     if ((f->fu_name == NULL) && arg->pn_value) {
@@ -300,112 +324,94 @@ mkfnode(const char *func, struct pnode *arg)
             /* Well, too bad. */
             fprintf(cp_err, "Error: no such function as %s.\n",
                     func);
-            return (NULL);
+            return (struct pnode *) NULL;
         }
         /* (void) strcpy(buf, d->v_name); XXX */
-        return (mksnode(buf));
-    } else if (f->fu_name == NULL) {
+        return PP_mksnode(buf);
+    }
+    else if (f->fu_name == NULL) {
         fprintf(cp_err, "Error: no function as %s with that arity.\n",
                 func);
         free_pnode(arg);
-        return (NULL);
+        return (struct pnode *) NULL;
     }
 
     if (!f->fu_func && arg->pn_op && arg->pn_op->op_num == PT_OP_COMMA) {
-        p = mkbnode(PT_OP_MINUS, mkfnode(func, arg->pn_left),
-                    mkfnode(func, arg->pn_right));
-        tfree(arg);
+        p = PP_mkbnode(PT_OP_MINUS, PP_mkfnode(func, arg->pn_left),
+                    PP_mkfnode(func, arg->pn_right));
+        free_pnode(arg);
         return p;
     }
 
-    p = alloc(struct pnode);
-    p->pn_use = 0;
-    p->pn_name = NULL;
-    p->pn_value = NULL;
+    p = alloc_pnode();
+
     p->pn_func = f;
-    p->pn_op = NULL;
+
     p->pn_left = arg;
-    if (p->pn_left)
+    if (p->pn_left) {
         p->pn_left->pn_use++;
-    p->pn_right = NULL;
-    p->pn_next = NULL;
-    return (p);
-}
+    }
+
+    return p;
+} /* end of function PP_mkfnode */
+
 
 
 /* Number node. */
-
-static struct pnode *
-mknnode(double number)
+struct pnode *PP_mknnode(double number)
 {
     struct pnode *p;
     struct dvec *v;
-    char buf[BSIZE_SP];
 
-    p = alloc(struct pnode);
-    v = alloc(struct dvec);
-    ZERO(v, struct dvec);
-    p->pn_use = 0;
-    p->pn_name = NULL;
-    p->pn_value = v;
-    p->pn_func = NULL;
-    p->pn_op = NULL;
-    p->pn_left = p->pn_right = NULL;
-    p->pn_next = NULL;
-
-    /* We don't use printnum because it screws up mkfnode above. We have
+    /* We don't use printnum because it screws up PP_mkfnode above. We have
      * to be careful to deal properly with node numbers that are quite
      * large...
      */
-    if (number < MAXPOSINT)
-        (void) sprintf(buf, "%d", (int) number);
-    else
-        (void) sprintf(buf, "%G", number);
-    v->v_name = copy(buf);
-    v->v_type = SV_NOTYPE;
-    v->v_flags = VF_REAL;
-    v->v_realdata = TMALLOC(double, 1);
-    *v->v_realdata = number;
-    v->v_length = 1;
-    v->v_plot = NULL;
+    v = dvec_alloc(number <= INT_MAX
+                   ? tprintf("%d", (int) number)
+                   : tprintf("%G", number),
+                   SV_NOTYPE,
+                   VF_REAL,
+                   1, NULL);
+
+    v->v_realdata[0] = number;
+
     vec_new(v);
+
+    p = alloc_pnode();
+    p->pn_value = v;
     return (p);
-}
+} /* end of function PP_mknnode */
+
 
 
 /* String node. */
-
-static struct pnode *
-mksnode(const char *string)
+struct pnode *PP_mksnode(const char *string)
 {
     struct dvec *v, *nv, *vs, *newv = NULL, *end = NULL;
     struct pnode *p;
 
-    p = alloc(struct pnode);
-    p->pn_use = 0;
-    p->pn_name = NULL;
-    p->pn_func = NULL;
-    p->pn_op = NULL;
-    p->pn_left = p->pn_right = NULL;
-    p->pn_next = NULL;
+    p = alloc_pnode();
     v = vec_get(string);
     if (v == NULL) {
-        nv = alloc(struct dvec);
-        ZERO(nv, struct dvec);
+        nv = dvec_alloc(copy(string),
+                        SV_NOTYPE,
+                        0,
+                        0, NULL);
         p->pn_value = nv;
-        nv->v_name = copy(string);
-        return (p);
+        return p;
     }
-    p->pn_value = NULL;
 
     /* It's not obvious that we should be doing this, but... */
     for (vs = v; vs; vs = vs->v_link2) {
         nv = vec_copy(vs);
         vec_new(nv);
-        if (end)
+        if (end) {
             end->v_link2 = nv;
-        else
+        }
+        else {
             newv = end = nv;
+        }
         end = nv;
     }
     p->pn_value = newv;
@@ -418,43 +424,67 @@ mksnode(const char *string)
     /* The two lines above have been commented out to prevent deletion of @xxx[par]
        after execution of only a single command like plot @xxx[par] or write. We need to
        monitor if this will lead to excessive memory usage. h_vogt 090221 */
-    return (p);
-}
+    return p;
+} /* end of function PP_mksnode */
+
+
+
+struct pnode *alloc_pnode(void)
+{
+    struct pnode *pn = TMALLOC(struct pnode, 1);
+
+    pn->pn_use = 0;
+    pn->pn_name = NULL;
+
+    // fixme, thats actually a union ...
+    pn->pn_value = NULL;
+    pn->pn_func = NULL;
+    pn->pn_op = NULL;
+
+    pn->pn_left = NULL;
+    pn->pn_right = NULL;
+    pn->pn_next = NULL;
+
+    return pn;
+} /* end of function alloc_pnode */
+
 
 
 /* Don't call this directly, always use the free_pnode() macro.
    The linked pnodes do not necessarily form a perfect tree as some nodes get
-   reused.  Hence, in this recursive walk trough the 'tree' we only free node
-   that have their pn_use value at zero. Nodes that have pn_use values above
-   zero have the link severed and their pn_use value decremented.
+   reused.  Hence, in this recursive walk through the 'tree', we only free
+   nodes that have their pn_use value at zero. Nodes that have pn_use values
+   above zero have the link severed and their pn_use value decremented.
    In addition, we don't walk past nodes with pn_use values avoid zero, just
-   in case we have a circular reference (this probable does not happen in
-   practice, but it does no harm playing safe) */
-void
-free_pnode_x(struct pnode *t)
+   in case we have a circular reference (This probably does not happen in
+   practice, but it does no harm playing safe.) */
+void free_pnode_x(struct pnode *t)
 {
-    if (!t)
+    if (!t) {
         return;
+    }
 
-    /* don't walk past nodes used elsewhere. We decrement the pn_use value here,
+    /* Don't walk past nodes used elsewhere. We decrement the pn_use value here,
        but the link gets severed by the action of the free_pnode() macro */
     if (t->pn_use > 1) {
         t->pn_use--;
-    } else {
+    }
+    else {
         /* pn_use is now 1, so its safe to free the pnode */
         free_pnode(t->pn_left);
         free_pnode(t->pn_right);
         free_pnode(t->pn_next);
         tfree(t->pn_name); /* va: it is a copy() of original string, can be free'd */
-        if (t->pn_value && !(t->pn_value->v_flags & VF_PERMANENT))
+        if (t->pn_use == 1 && t->pn_value && !(t->pn_value->v_flags & VF_PERMANENT)) {
             vec_free(t->pn_value); /* patch by Stefan Jones */
-        tfree(t);
+        }
+        txfree(t);
     }
-}
+} /* end of function free_pnode_x */
 
 
-static void
-db_print_func(FILE *fdst, struct func *f)
+
+static void db_print_func(FILE *fdst, struct func *f)
 {
     if (!f) {
         fprintf(fdst, "nil");
@@ -462,11 +492,11 @@ db_print_func(FILE *fdst, struct func *f)
     }
 
     fprintf(fdst, "(func :fu_name %s :fu_func %p)", f->fu_name, f->fu_func);
-}
+} /* end of function db_print_func */
 
 
-static void
-db_print_op(FILE *fdst, struct op *op)
+
+static void db_print_op(FILE *fdst, struct op *op)
 {
     if (!op) {
         fprintf(fdst, "nil");
@@ -475,11 +505,11 @@ db_print_op(FILE *fdst, struct op *op)
 
     fprintf(fdst, "(op :op_num %d :op_name %s :op_arity %d :op_func %p)",
             op->op_num, op->op_name, op->op_arity, op->op_func.anonymous);
-}
+} /* end of function db_print_op */
 
 
-static void
-db_print_dvec(FILE *fdst, struct dvec *d)
+
+static void db_print_dvec(FILE *fdst, struct dvec *d)
 {
     if (!d) {
         fprintf(fdst, "nil");
@@ -488,11 +518,11 @@ db_print_dvec(FILE *fdst, struct dvec *d)
 
     fprintf(fdst, "(dvec :v_name %s :v_type %d :v_flags %d :v_length %d ...)",
             d->v_name, d->v_type, d->v_flags, d->v_length);
-}
+} /* end of function db_print_dvec */
 
 
-static void
-db_print_pnode(FILE *fdst, struct pnode *p)
+
+static void db_print_pnode(FILE *fdst, struct pnode *p)
 {
     if (!p) {
         fprintf(fdst, "nil\n");
@@ -500,8 +530,7 @@ db_print_pnode(FILE *fdst, struct pnode *p)
     }
 
     if (!p->pn_name && p->pn_value && !p->pn_func && !p->pn_op &&
-        !p->pn_left && !p->pn_right && !p->pn_next)
-    {
+        !p->pn_left && !p->pn_right && !p->pn_next) {
         fprintf(fdst, "(pnode-value :pn_use %d", p->pn_use);
         fprintf(fdst, " :pn_value "); db_print_dvec(fdst, p->pn_value);
         fprintf(fdst, ")\n");
@@ -509,8 +538,7 @@ db_print_pnode(FILE *fdst, struct pnode *p)
     }
 
     if (!p->pn_name && !p->pn_value && p->pn_func && !p->pn_op &&
-        !p->pn_right && !p->pn_next)
-    {
+        !p->pn_right && !p->pn_next) {
         fprintf(fdst, "(pnode-func :pn_use %d", p->pn_use);
         fprintf(fdst, "\n :pn_func "); db_print_func(fdst, p->pn_func);
         fprintf(fdst, "\n :pn_left "); db_print_pnode(fdst, p->pn_left);
@@ -519,8 +547,7 @@ db_print_pnode(FILE *fdst, struct pnode *p)
     }
 
     if (!p->pn_name && !p->pn_value && !p->pn_func && p->pn_op &&
-        !p->pn_next)
-    {
+        !p->pn_next) {
         fprintf(fdst, "(pnode-op :pn_use %d", p->pn_use);
         fprintf(fdst, "\n :pn_op "); db_print_op(fdst, p->pn_op);
         fprintf(fdst, "\n :pn_left "); db_print_pnode(fdst, p->pn_left);
@@ -537,11 +564,11 @@ db_print_pnode(FILE *fdst, struct pnode *p)
     fprintf(fdst, "\n :pn_right "); db_print_pnode(fdst, p->pn_right);
     fprintf(fdst, "\n :pn_next "); db_print_pnode(fdst, p->pn_next);
     fprintf(fdst, "\n)\n");
-}
+} /* end of function db_print_pnode */
 
 
-void
-db_print_pnode_tree(struct pnode *p, char *print)
+
+void db_print_pnode_tree(struct pnode *p, char *print)
 {
 #if 1
     NG_IGNORE(print);
@@ -554,20 +581,21 @@ db_print_pnode_tree(struct pnode *p, char *print)
     fclose(db_stream);
     if (print)
         printf("%s:%d: %s {%s}\n%s\n", __FILE__, __LINE__, __func__, print, buf);
-    free(buf);
+    tfree(buf);
 #endif
-}
+} /* end of function db_print_pnode_tree */
 
 
-int
-PPlex(YYSTYPE *lvalp, struct PPltype *llocp, char **line)
+
+int PPlex(YYSTYPE *lvalp, struct PPltype *llocp, char **line)
 {
     static char *specials = " \t%()-^+*,/|&<>~=";
     char  *sbuf = *line;
     int token;
 
-    while ((*sbuf == ' ') || (*sbuf == '\t'))
+    while ((*sbuf == ' ') || (*sbuf == '\t')) {
         sbuf++;
+    }
 
     llocp->start = sbuf;
 
@@ -577,28 +605,36 @@ PPlex(YYSTYPE *lvalp, struct PPltype *llocp, char **line)
     if ((sbuf[0] == 'g') && (sbuf[1] == 't') &&
         strchr(specials, sbuf[2])) {
         lexer_return('>', 2);
-    } else if ((sbuf[0] == 'l') && (sbuf[1] == 't') &&
+    }
+    else if ((sbuf[0] == 'l') && (sbuf[1] == 't') &&
                strchr(specials, sbuf[2])) {
         lexer_return('<', 2);
-    } else if ((sbuf[0] == 'g') && (sbuf[1] == 'e') &&
+    }
+    else if ((sbuf[0] == 'g') && (sbuf[1] == 'e') &&
                strchr(specials, sbuf[2])) {
         lexer_return(TOK_GE, 2);
-    } else if ((sbuf[0] == 'l') && (sbuf[1] == 'e') &&
+    }
+    else if ((sbuf[0] == 'l') && (sbuf[1] == 'e') &&
                strchr(specials, sbuf[2])) {
         lexer_return(TOK_LE, 2);
-    } else if ((sbuf[0] == 'n') && (sbuf[1] == 'e') &&
+    }
+    else if ((sbuf[0] == 'n') && (sbuf[1] == 'e') &&
                strchr(specials, sbuf[2])) {
         lexer_return(TOK_NE, 2);
-    } else if ((sbuf[0] == 'e') && (sbuf[1] == 'q') &&
+    }
+    else if ((sbuf[0] == 'e') && (sbuf[1] == 'q') &&
                strchr(specials, sbuf[2])) {
         lexer_return('=', 2);
-    } else if ((sbuf[0] == 'o') && (sbuf[1] == 'r') &&
+    }
+    else if ((sbuf[0] == 'o') && (sbuf[1] == 'r') &&
                strchr(specials, sbuf[2])) {
         lexer_return('|', 2);
-    } else if ((sbuf[0] == 'a') && (sbuf[1] == 'n') &&
+    }
+    else if ((sbuf[0] == 'a') && (sbuf[1] == 'n') &&
                (sbuf[2] == 'd') && strchr(specials, sbuf[3])) {
         lexer_return('&', 3);
-    } else if ((sbuf[0] == 'n') && (sbuf[1] == 'o') &&
+    }
+    else if ((sbuf[0] == 'n') && (sbuf[1] == 'o') &&
                (sbuf[2] == 't') && strchr(specials, sbuf[3])) {
         lexer_return('~', 3);
     }
@@ -606,32 +642,23 @@ PPlex(YYSTYPE *lvalp, struct PPltype *llocp, char **line)
     switch (*sbuf) {
 
     case '[':
-        if (sbuf[1] == '[') {
-            lexer_return(TOK_LRANGE, 2);
-        } else {
-            lexer_return(*sbuf, 1);
-        }
-
     case ']':
-        if (sbuf[1] == ']') {
-            lexer_return(TOK_RRANGE, 2);
-        } else {
-            lexer_return(*sbuf, 1);
-        }
+        lexer_return(*sbuf, 1);
 
     case '>':
-    case '<':
-    {
+    case '<': {
         /* Workaround, The Frontend makes "<>" into "< >" */
-        int j = 1;
-        while (isspace(sbuf[j]))
+        size_t j = 1;
+        while (isspace_c(sbuf[j]))
             j++;
         if (((sbuf[j] == '<') || (sbuf[j] == '>')) && (sbuf[0] != sbuf[j])) {
             /* Allow both <> and >< for NE. */
-            lexer_return(TOK_NE, j+1);
-        } else if (sbuf[1] == '=') {
+            lexer_return(TOK_NE, j + 1);
+        }
+        else if (sbuf[1] == '=') {
             lexer_return((sbuf[0] == '>') ? TOK_GE : TOK_LE, 2);
-        } else {
+        }
+        else {
             lexer_return(*sbuf, 1);
         }
     }
@@ -656,56 +683,84 @@ PPlex(YYSTYPE *lvalp, struct PPltype *llocp, char **line)
     case '\0':
         lexer_return(*sbuf, 0);
 
-    case '"':
-    {
+    case '"': {
         char *start = ++sbuf;
         while (*sbuf && (*sbuf != '"'))
             sbuf++;
         lvalp->str = copy_substring(start, sbuf);
-        if (*sbuf)
+        if (*sbuf) {
             sbuf++;
+        }
         lexer_return(TOK_STR, 0);
     }
 
-    default:
-    {
+    default: {
         char *s = sbuf;
-        double *td = ft_numparse(&s, FALSE);
-        if ((!s || *s != ':') && td) {
+        double val;
+
+        if (ft_numparse(&s, FALSE, &val) >= 0 &&
+                (!s || *s != ':')) {
             sbuf = s;
-            lvalp->num = *td;
+            lvalp->num = val;
             lexer_return(TOK_NUM, 0);
-        } else {
+        }
+        else {
             int atsign = 0;
             char *start = sbuf;
             /* It is bad how we have to recognise '[' -- sometimes
              * it is part of a word, when it defines a parameter
              * name, and otherwise it isn't.
-             * va, ']' too
+             *
+             * what is valid here ?
+             *   foo  dc1.foo  dc1.@m1[vth]
+             *   vthing#branch
+             *   i(vthing)
              */
             for (; *sbuf && !strchr(specials, *sbuf); sbuf++)
-                if (*sbuf == '@')
+                if (*sbuf == '@') {
                     atsign = 1;
-                else if (!atsign && (*sbuf == '[' || *sbuf == ']'))
+                }
+                else if (!atsign && *sbuf == '[') {
                     break;
+                }
+                else if (*sbuf == ']') {
+                    if (atsign) {
+                        sbuf++;
+                    }
+                    break;
+                }
+            /* keep the identifier i(vss) as a single token, even as dc1.i(vss) */
+                else if (prefix("i(v", sbuf)) {
+                    if (get_r_paren(&sbuf) == 1) {
+                        fprintf(stderr, "Error: missing ')' in token\n    %s\n", start);
+                        break;
+                    }
+                    sbuf--;
+                }
 
             lvalp->str = copy_substring(start, sbuf);
             lexer_return(TOK_STR, 0);
         }
     }
-    }
+    } /* end of switch over characters */
 
 done:
     if (ft_parsedb) {
-        if (token == TOK_STR)
+        if (token == TOK_STR) {
             fprintf(stderr, "lexer: TOK_STR, \"%s\"\n", lvalp->str);
-        else if (token == TOK_NUM)
+        }
+        else if (token == TOK_NUM) {
             fprintf(stderr, "lexer: TOK_NUM, %G\n", lvalp->num);
-        else
+        }
+        else {
             fprintf(stderr, "lexer: token %d\n", token);
+        }
     }
 
     *line = sbuf;
     llocp->stop = sbuf;
-    return (token);
-}
+    return token;
+} /* end of function PPlex */
+
+
+

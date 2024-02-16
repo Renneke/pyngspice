@@ -23,11 +23,11 @@ VSRCtemp(GENmodel *inModel, CKTcircuit *ckt)
     NG_IGNORE(ckt);
 
     /*  loop through all the voltage source models */
-    for( ; model != NULL; model = model->VSRCnextModel ) {
+    for( ; model != NULL; model = VSRCnextModel(model)) {
 
         /* loop through all the instances of the model */
-        for (here = model->VSRCinstances; here != NULL ;
-                here=here->VSRCnextInstance) {
+        for (here = VSRCinstances(model); here != NULL ;
+                here=VSRCnextInstance(here)) {
 
             if(here->VSRCacGiven && !here->VSRCacMGiven) {
                 here->VSRCacMag = 1;
@@ -38,13 +38,13 @@ VSRCtemp(GENmodel *inModel, CKTcircuit *ckt)
             if(!here->VSRCdcGiven) {
                 /* no DC value - either have a transient value, or none */
                 if(here->VSRCfuncTGiven) {
-                    SPfrontEnd->IFerror (ERR_WARNING,
+                    SPfrontEnd->IFerrorf (ERR_WARNING,
                             "%s: no DC value, transient time 0 value used",
-                            &(here->VSRCname));
+                            here->VSRCname);
                 } else {
-                    SPfrontEnd->IFerror (ERR_WARNING,
+                    SPfrontEnd->IFerrorf (ERR_WARNING,
                             "%s: has no value, DC 0 assumed",
-                            &(here->VSRCname));
+                            here->VSRCname);
                 }
             }
             radians = here->VSRCacPhase * M_PI / 180.0;

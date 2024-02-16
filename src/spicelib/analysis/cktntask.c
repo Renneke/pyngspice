@@ -39,6 +39,8 @@ CKTnewTask(CKTcircuit *ckt, TSKtask **taskPtr, IFuid taskName, TSKtask **defPtr)
         tsk->TSKnomTemp         = def->TSKnomTemp;
         tsk->TSKmaxOrder        = def->TSKmaxOrder;
         tsk->TSKintegrateMethod = def->TSKintegrateMethod;
+        tsk->TSKindverbosity    = def->TSKindverbosity;
+        tsk->TSKxmu             = def->TSKxmu;
         tsk->TSKbypass          = def->TSKbypass;
         tsk->TSKdcMaxIter       = def->TSKdcMaxIter;
         tsk->TSKdcTrcvMaxIter   = def->TSKdcTrcvMaxIter;
@@ -72,6 +74,7 @@ CKTnewTask(CKTcircuit *ckt, TSKtask **taskPtr, IFuid taskName, TSKtask **defPtr)
         tsk->TSKabsDv           = def->TSKabsDv;
         tsk->TSKrelDv           = def->TSKrelDv;
         tsk->TSKnoopac          = def->TSKnoopac;
+        tsk->TSKepsmin          = def->TSKepsmin;
 #ifdef NEWTRUNC
         tsk->TSKlteReltol       = def->TSKlteReltol;
         tsk->TSKlteAbstol       = def->TSKlteAbstol;
@@ -98,6 +101,15 @@ CKTnewTask(CKTcircuit *ckt, TSKtask **taskPtr, IFuid taskName, TSKtask **defPtr)
         tsk->TSKdcTrcvMaxIter   = 50;
         tsk->TSKintegrateMethod = TRAPEZOIDAL;
         tsk->TSKmaxOrder        = 2;
+        /* full check, and full verbosity */
+        tsk->TSKindverbosity    = 2;
+        /*
+         * when using trapezoidal method
+         *   xmu=0:    Backward Euler
+         *   xmu=0.5:  trapezoidal (standard)
+         *   xmu=0.49: good damping of current ringing, e.g. in R.O.s.
+         */
+        tsk->TSKxmu             = 0.5;
         tsk->TSKnumSrcSteps     = 1;
         tsk->TSKnumGminSteps    = 1;
         tsk->TSKgminFactor      = 10;
@@ -118,6 +130,7 @@ CKTnewTask(CKTcircuit *ckt, TSKtask **taskPtr, IFuid taskName, TSKtask **defPtr)
         tsk->TSKnodeDamping     = 0;
         tsk->TSKabsDv           = 0.5;
         tsk->TSKrelDv           = 2.0;
+        tsk->TSKepsmin          = 1e-28;
 
 #if (1) /*CDHW*/
     }

@@ -96,7 +96,7 @@ cp_rehash(char *pathlist, bool docc)
 #  ifdef HAVE_GETCWD
             (void) getcwd(buf, sizeof(buf));
 #  else
-            *buf = 0;
+            *buf = '\0';
 #  endif
 #endif
             i = strlen(buf);
@@ -118,7 +118,7 @@ cp_rehash(char *pathlist, bool docc)
              * executable, but that is too slow
              * (as if "we" really cared).
              */
-            hh = alloc(struct hashent);
+            hh = TMALLOC(struct hashent, 1);
             hh->h_name = copy(entry->d_name);
             hh->h_path = curpath;
             i = hash(entry->d_name);

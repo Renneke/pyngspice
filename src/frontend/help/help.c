@@ -13,7 +13,7 @@ Modified 1999 Emmanuel Rouat
 #include "ngspice/hlpdefs.h"
 #include "ngspice/suffix.h"
 
-extern char *cp_tildexpand(char *string);
+extern char *cp_tildexpand(const char *string);
 
 char *hlp_directory;
 extern char *hlp_filelist[];
@@ -71,7 +71,7 @@ findglobalsubject(char *subject)
     char **dict;
     long fpos;
 
-    place = 0;
+    place = NULL;
     for (dict = hlp_filelist; *dict && **dict; dict++) {
         fpos = findsubject(*dict, subject);
         if (fpos != -1) {

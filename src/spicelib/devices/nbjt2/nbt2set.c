@@ -35,8 +35,6 @@ NBJT2setup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
   MODLcard *models;
   OPTNcard *options;
   OUTPcard *outputs;
-  char *icFileName = NULL;
-  size_t nameLen;
   int error, xIndex;
   int xMeshSize, yMeshSize;
   TWOdevice *pDevice;
@@ -52,7 +50,7 @@ NBJT2setup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
  
 
   /* loop through all the models */
-  for (; model != NULL; model = model->NBJT2nextModel) {
+  for (; model != NULL; model = NBJT2nextModel(model)) {
     if (!model->NBJT2pInfo) {
       TSCALLOC(model->NBJT2pInfo, 1, TWOtranInfo);
     }
@@ -164,8 +162,8 @@ NBJT2setup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
     model->NBJT2dopTables = dopTableList;
 
     /* loop through all the instances of the model */
-    for (inst = model->NBJT2instances; inst != NULL;
-	inst = inst->NBJT2nextInstance) {
+    for (inst = NBJT2instances(model); inst != NULL;
+         inst = NBJT2nextInstance(inst)) {
 
       startTime = SPfrontEnd->IFseconds();
 
@@ -176,16 +174,9 @@ NBJT2setup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
       }
       if (!inst->NBJT2icFileGiven) {
 	if (options->OPTNunique) {
-	  nameLen = strlen(options->OPTNicFile) + strlen(inst->NBJT2name) + 1;
-	  TSCALLOC(icFileName, nameLen+1, char);
-	  sprintf(icFileName, "%s.%s", options->OPTNicFile, inst->NBJT2name);
-	  icFileName[nameLen] = '\0';
-          inst->NBJT2icFile = icFileName;
+	  inst->NBJT2icFile = tprintf("%s.%s", options->OPTNicFile, inst->NBJT2name);
 	} else if (options->OPTNicFile != NULL) {
-	  nameLen = strlen(options->OPTNicFile);
-	  TSCALLOC(icFileName, nameLen+1, char);
-	  icFileName = strcpy(icFileName, options->OPTNicFile);
-	  inst->NBJT2icFile = icFileName;
+	  inst->NBJT2icFile = tprintf("%s", options->OPTNicFile);
 	} else {
 	  inst->NBJT2icFile = NULL;
 	}
@@ -222,7 +213,7 @@ NBJT2setup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
 	    pMaterial = pMaterial->next;
 	  }
 	  /* Copy everything, then fix the incorrect pointer. */
-	  bcopy(pM, pMaterial, sizeof(TWOmaterial));
+	  memcpy(pMaterial, pM, sizeof(TWOmaterial));
 	  pMaterial->next = NULL;
 	}
 
@@ -236,7 +227,7 @@ NBJT2setup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
       TWOgetStatePointers(inst->NBJT2pDevice, states);
 
       /* Wipe out statistics from previous runs (if any). */
-      bzero(inst->NBJT2pDevice->pStats, sizeof(TWOstats));
+      memset(inst->NBJT2pDevice->pStats, 0, sizeof(TWOstats));
 
       inst->NBJT2pDevice->pStats->totalTime[STAT_SETUP] +=
 	  SPfrontEnd->IFseconds() - startTime;

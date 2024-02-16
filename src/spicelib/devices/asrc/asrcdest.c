@@ -6,29 +6,12 @@ Author: 1987 Kanwar Jit Singh
 #include "ngspice/ngspice.h"
 #include "asrcdefs.h"
 #include "ngspice/suffix.h"
-#include "ngspice/inpdefs.h"
+
 
 void
-ASRCdestroy(GENmodel **model)
-
+ASRCdestroy(void)
 {
-    ASRCmodel **start = (ASRCmodel**)model; /* starting model */
-    ASRCinstance *here;     /* current instance */
-    ASRCinstance *next;
-    ASRCmodel *mod = *start;    /* current model */
-    ASRCmodel *nextmod;
-
-    for( ; mod ; mod = nextmod) {
-        for(here = mod->ASRCinstances ; here ; here = next) {
-            next = here->ASRCnextInstance;
-	    FREE(here->ASRCacValues);
-	    INPfreeTree(here->ASRCtree);
-	    if(here->ASRCposptr)
-		free(here->ASRCposptr);
-            FREE(here);
-        }
-        nextmod = mod->ASRCnextModel;
-        FREE(mod);
-    }
-    *model = NULL;
+    FREE(asrc_vals);
+    FREE(asrc_derivs);
+    asrc_nvals = 0;
 }

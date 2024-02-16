@@ -4,11 +4,11 @@
  Copyright (C) 2012 Hiroshima University & STARC
 
  MODEL NAME : HiSIM_HV 
- ( VERSION : 1  SUBVERSION : 2  REVISION : 3 )
+ ( VERSION : 1  SUBVERSION : 2  REVISION : 4 )
  Model Parameter VERSION : 1.23
  FILE : hsmhvgetic.c
 
- DATE : 2012.4.6
+ DATE : 2013.04.30
 
  released by 
                 Hiroshima University &
@@ -32,8 +32,8 @@ int HSMHVgetic(
    * external nodes to get values
    */
 
-  for ( ;model ;model = model->HSMHVnextModel ) {
-    for ( here = model->HSMHVinstances; here ;here = here->HSMHVnextInstance ) {
+  for ( ;model ;model = HSMHVnextModel(model)) {
+    for ( here = HSMHVinstances(model); here ;here = HSMHVnextInstance(here)) {
       if (!here->HSMHV_icVBS_Given) {
 	here->HSMHV_icVBS = 
 	  *(ckt->CKTrhs + here->HSMHVbNode) - 

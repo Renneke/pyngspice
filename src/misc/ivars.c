@@ -6,16 +6,6 @@ Copyright 1991 Regents of the University of California.  All rights reserved.
 #include "ivars.h"
 #include "../misc/util.h" /* ngdirname() */
 
-#ifdef HAVE_ASPRINTF
-#ifdef HAVE_LIBIBERTY_H /* asprintf */
-#include <libiberty.h>
-#elif defined(__MINGW32__) || defined(__SUNPRO_C) /* we have asprintf, but not libiberty.h */
-#include <stdarg.h>
-extern int asprintf(char **out, const char *fmt, ...);
-extern int vasprintf(char **out, const char *fmt, va_list ap);
-#endif
-#endif
-
 char *Spice_Path;
 char *News_File;
 char *Help_Path;
@@ -34,40 +24,47 @@ env_overr(char **v, char *e)
 static void
 mkvar(char **p, char *path_prefix, char *var_dir, char *env_var)
 {
-    char *buffer;
-
     /* Override by environment variables */
-    buffer = getenv(env_var);
+    char *buffer = getenv(env_var);
 
-#ifdef HAVE_ASPRINTF
     if (buffer)
-        asprintf(p, "%s", buffer);
+        *p = tprintf("%s",buffer);
     else
-        asprintf(p, "%s%s%s", path_prefix, DIR_PATHSEP, var_dir);
-#else /* ~ HAVE_ASPRINTF */
-    if (buffer){
-        *p = TMALLOC(char, strlen(buffer) + 1);
-        sprintf(*p,"%s",buffer);
-        /* asprintf(p, "%s", buffer); */
-    }
-    else{
-        *p = TMALLOC(char, strlen(path_prefix) + strlen(DIR_PATHSEP) + strlen(var_dir) + 1);
-        sprintf(*p, "%s%s%s", path_prefix, DIR_PATHSEP, var_dir); 
-        /* asprintf(p, "%s%s%s", path_prefix, DIR_PATHSEP, var_dir); */
-    }
-#endif /* HAVE_ASPRINTF */
+        *p = tprintf("%s%s%s", path_prefix, DIR_PATHSEP, var_dir);
 }
 
+    /* $dprefix has been set to /usr/local or C:/Spice (Windows) in configure.ac,
+    or to <path> given by prefix="<path>" as parameter to ./configure command.
+    NGSPICEBINDIR has been set to $dprefix/bin in config.h.
+    NGSPICEDATADIR has been set to $dprefix/share/ngspice in config.h.
+    If --enable-relpath is selected as paramter to the ./configure command, then
+    NGSPICEBINDIR is set to ../bin in config.h.
+    NGSPICEDATADIR is set to ../share/ngspice in config.h.
+    Spice_Exec_Dir has been set to NGSPICEBINDIR in conf.c,
+    may be overridden here by environmental variable SPICE_EXEC_DIR.
+    Spice_Lib_Dir has been set to NGSPICEDATADIR in conf.c,
+    may be overridden here by environmental variable SPICE_LIB_DIR.
+    The search path for codemodels in spinit contains $dprefix, or, if --enable-relpath
+    is given, to ../lib, set by src/makefile.am. With Visual C, it is set manually by
+    an entry to ngspice\visualc\src\include\ngspice\config.h.
+    For Windows GUI and Console the path is set relative to the executable.*/
 void
 ivars(char *argv0)
 {
     char *temp=NULL;
-	 /* $dprefix has been set to /usr/local or C:/Spice (Windows) in configure.ac,
-    NGSPICEBINDIR has been set to $dprefix/bin in configure.ac, 
-    Spice_Exec_Dir has been set to NGSPICEBINDIR in conf.c,
-    may be overridden here by environmental variable SPICE_EXEC_DIR */
-    env_overr(&Spice_Exec_Dir, "SPICE_EXEC_DIR");
+#if defined (HAS_WINGUI) || defined (__MINGW32__) || defined (_MSC_VER)
+    char *ngpath;
+#endif
+
+#ifdef HAS_RELPATH
+    Spice_Lib_Dir = temp = copy("../share/ngspice");
+#elif !defined SHARED_MODULE && (defined (HAS_WINGUI) || defined (__MINGW32__) || defined (_MSC_VER))
+    ngpath = ngdirname(argv0);
+    mkvar(&Spice_Lib_Dir, ngpath, "../share/ngspice", "SPICE_LIB_DIR");
+    tfree(ngpath);
+#else
     env_overr(&Spice_Lib_Dir, "SPICE_LIB_DIR");
+#endif
 
     /* for printing a news file */
     mkvar(&News_File, Spice_Lib_Dir, "news", "SPICE_NEWS");
@@ -77,11 +74,12 @@ ivars(char *argv0)
     mkvar(&Lib_Path, Spice_Lib_Dir, "scripts", "SPICE_SCRIPTS");
     /* used to call ngspice with aspice command, not used in Windows mode */
     mkvar(&Spice_Path, Spice_Exec_Dir, "ngspice", "SPICE_PATH");
+    tfree(temp);
     /* may be used to store input files (*.lib, *.include, ...) */
     /* get directory where ngspice resides */
 #if defined (HAS_WINGUI) || defined (__MINGW32__) || defined (_MSC_VER)
     {
-        char *ngpath = ngdirname(argv0);
+        ngpath = ngdirname(argv0);
         /* set path either to <ngspice-bin-directory>/input or,
         if set, to environment variable NGSPICE_INPUT_DIR */
         mkvar(&Inp_Path, ngpath, "input", "NGSPICE_INPUT_DIR");

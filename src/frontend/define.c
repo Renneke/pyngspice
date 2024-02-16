@@ -26,10 +26,11 @@ Author: 1985 Wayne A. Christopher, U. C. Berkeley CAD Group
 
 static void savetree(struct pnode *pn);
 static void prdefs(char *name);
-static void prtree(struct udfunc *ud);
+static void prtree(struct udfunc *ud, FILE *fp);
 static void prtree1(struct pnode *pn, FILE *fp);
-static struct pnode *trcopy(struct pnode *tree, char *args, struct pnode *nn);
+static struct pnode *trcopy(struct pnode *tree, char *arg_names, struct pnode *args);
 static struct pnode *ntharg(int num, struct pnode *args);
+static int numargs(struct pnode *args);
 
 static struct udfunc *udfuncs = NULL;
 
@@ -58,16 +59,15 @@ com_define(wordlist *wlist)
      */
     buf[0] = '\0';
 
-    for (wl = wlist; wl && (strchr(wl->wl_word, /* ( */ ')') == NULL);
+    for (wl = wlist; wl && (strchr(wl->wl_word, ')') == NULL);
          wl = wl->wl_next)
         (void) strcat(buf, wl->wl_word);
 
     if (wl) {
-        for (t = buf; *t; t++)
-            ;
-        for (s = wl->wl_word; *s && (*s != /* ( */ ')'); s++, t++)
-            *t = *s;
-        *t++ = /* ( */ ')';
+        t = strchr(buf, '\0');
+        for (s = wl->wl_word; *s && (*s != ')');)
+            *t++ = *s++;
+        *t++ = ')';
         *t = '\0';
         if (*++s)
             wl->wl_word = copy(s);
@@ -77,6 +77,9 @@ com_define(wordlist *wlist)
 
     /* If that's all, then print the definition. */
     if (wl == NULL) {
+        s = strchr(buf, '(');
+        if (s)
+            *s = '\0';
         prdefs(buf);
         return;
     }
@@ -87,7 +90,7 @@ com_define(wordlist *wlist)
     (void) strcpy(tbuf, buf);
 
     for (b = tbuf; *b; b++)
-        if (isspace(*b) || (*b == '(' /* ) */)) {
+        if (isspace_c(*b) || (*b == '(')) {
             *b = '\0';
             break;
         }
@@ -115,11 +118,11 @@ com_define(wordlist *wlist)
     /* Format the name properly and add to the list. */
     b = copy(buf);
     for (s = b; *s; s++) {
-        if (*s == '(') { /*)*/
+        if (*s == '(') {
             *s = '\0';
-            if (s[1] != /*(*/ ')')
+            if (s[1] != ')')
                 arity++;    /* It will have been 0. */
-        } else if (*s == /*(*/ ')') {
+        } else if (*s == ')') {
             *s = '\0';
         } else if (*s == ',') {
             *s = '\0';
@@ -132,14 +135,9 @@ com_define(wordlist *wlist)
             break;
 
     if (udf == NULL) {
-        udf = alloc(struct udfunc);
-        if (udfuncs == NULL) {
-            udfuncs = udf;
-            udf->ud_next = NULL;
-        } else {
-            udf->ud_next = udfuncs;
-            udfuncs = udf;
-        }
+        udf = TMALLOC(struct udfunc, 1);
+        udf->ud_next = udfuncs;
+        udfuncs = udf;
     }
 
     udf->ud_text = names;
@@ -163,22 +161,20 @@ savetree(struct pnode *pn)
          */
         d = pn->pn_value;
         if ((d->v_length != 0) || eq(d->v_name, "list")) {
-            pn->pn_value = alloc(struct dvec);
-            ZERO(pn->pn_value, struct dvec);
-            pn->pn_value->v_name = copy(d->v_name);
-            pn->pn_value->v_length = d->v_length;
-            pn->pn_value->v_type = d->v_type;
-            pn->pn_value->v_flags = d->v_flags;
-            pn->pn_value->v_plot = NULL; /* this dvec isn't member of any plot */
+            pn->pn_value = dvec_alloc(copy(d->v_name),
+                                      d->v_type,
+                                      d->v_flags,
+                                      d->v_length, NULL);
+
+            /* this dvec isn't member of any plot */
+
             if (isreal(d)) {
-                pn->pn_value->v_realdata = TMALLOC(double, d->v_length);
-                bcopy(d->v_realdata,
-                      pn->pn_value->v_realdata,
+                memcpy(pn->pn_value->v_realdata,
+                      d->v_realdata,
                       sizeof(double) * (size_t) d->v_length);
             } else {
-                pn->pn_value->v_compdata = TMALLOC(ngcomplex_t, d->v_length);
-                bcopy(d->v_compdata,
-                      pn->pn_value->v_compdata,
+                memcpy(pn->pn_value->v_compdata,
+                      d->v_compdata,
                       sizeof(ngcomplex_t) * (size_t) d->v_length);
             }
         }
@@ -198,21 +194,14 @@ static void
 prdefs(char *name)
 {
     struct udfunc *udf;
-    char *s;
-
-    if (name) {
-        s = strchr(name, '(' /* ) */);
-        if (s)
-            *s = '\0';
-    }
 
     if (name && *name) {    /* You never know what people will do */
         for (udf = udfuncs; udf; udf = udf->ud_next)
             if (eq(name, udf->ud_name))
-                prtree(udf);
+                prtree(udf, cp_out);
     } else {
         for (udf = udfuncs; udf; udf = udf->ud_next)
-            prtree(udf);
+            prtree(udf, cp_out);
     }
 }
 
@@ -220,29 +209,26 @@ prdefs(char *name)
 /* Print out one definition. */
 
 static void
-prtree(struct udfunc *ud)
+prtree(struct udfunc *ud, FILE *fp)
 {
-    char *s, buf[BSIZE_SP];
+    const char *s = ud->ud_name;
 
-    /* Print the head. */
-    buf[0] = '\0';
-    (void) strcat(buf, ud->ud_name);
-    for (s = ud->ud_name; *s; s++)
-        ;
-    (void) strcat(buf, " (");
-    s++;
+    /* print the function name */
+    fprintf(fp, "%s (", s);
+    s = strchr(s, '\0') + 1;
+
+    /* print the formal args */
     while (*s) {
-        (void) strcat(buf, s);
-        while (*s)
-            s++;
-        if (s[1])
-            (void) strcat(buf, ", ");
-        s++;
+        fputs(s, fp);
+        s = strchr(s, '\0') + 1;
+        if (*s)
+            fputs(", ", fp);
     }
-    (void) strcat(buf, ") = ");
-    fputs(buf, cp_out);
-    prtree1(ud->ud_text, cp_out);
-    (void) putc('\n', cp_out);
+    fputs(") = ", fp);
+
+    /* print the function body */
+    prtree1(ud->ud_text, fp);
+    putc('\n', fp);
 }
 
 
@@ -274,45 +260,32 @@ prtree1(struct pnode *pn, FILE *fp)
 struct pnode *
 ft_substdef(const char *name, struct pnode *args)
 {
-    struct udfunc *udf;
-    struct pnode *tp;
-    char *s;
-    int arity = 0, rarity = 0;
-    bool found = FALSE;
+    struct udfunc *udf, *wrong_udf = NULL;
+    char *arg_names;
 
-    if (args)
-        arity = 1;
-
-    for (tp = args; tp && tp->pn_op && (tp->pn_op->op_num == PT_OP_COMMA); tp =
-             tp->pn_right)
-        arity++;
+    int arity = numargs(args);
 
     for (udf = udfuncs; udf; udf = udf->ud_next)
         if (eq(name, udf->ud_name)) {
-            if (arity == udf->ud_arity) {
+            if (arity == udf->ud_arity)
                 break;
-            } else {
-                found = TRUE;
-                rarity = udf->ud_arity;
-            }
+            wrong_udf = udf;
         }
 
     if (udf == NULL) {
-        if (found)
+        if (wrong_udf)
             fprintf(cp_err,
                     "Warning: the user-defined function %s has %d args\n",
-                    name, rarity);
-        return (NULL);
+                    name, wrong_udf->ud_arity);
+        return NULL;
     }
 
-    for (s = udf->ud_name; *s; s++)
-        ;
-    s++;
+    arg_names = strchr(udf->ud_name, '\0') + 1;
 
     /* Now we have to traverse the tree and copy it over,
      * substituting args.
      */
-    return (trcopy(udf->ud_text, s, args));
+    return trcopy(udf->ud_text, arg_names, args);
 }
 
 
@@ -323,83 +296,67 @@ ft_substdef(const char *name, struct pnode *args)
  */
 
 static struct pnode *
-trcopy(struct pnode *tree, char *args, struct pnode *nn)
+trcopy(struct pnode *tree, char *arg_names, struct pnode *args)
 {
-    struct pnode *pn;
-    struct dvec *d;
-    char *s;
-    int i;
-
     if (tree->pn_value) {
 
-        d = tree->pn_value;
+        struct dvec *d = tree->pn_value;
 
         if ((d->v_length == 0) && strcmp(d->v_name, "list")) {
+
             /* Yep, it's a formal parameter. Substitute for it.
              * IMPORTANT: we never free parse trees, so we
              * needn't worry that they aren't trees here.
              */
-            s = args;
-            i = 1;
-            while (*s) {
+
+            char *s = arg_names;
+            int i;
+
+            for (i = 1; *s; i++) {
                 if (eq(s, d->v_name))
-                    break;
-                else
-                    i++;
-                while (*s++)   /* Get past the last '\0'. */
-                    ;
+                    return ntharg(i, args);
+                s = strchr(s, '\0') + 1;
             }
 
-            if (*s)
-                return (ntharg(i, nn));
-            else
-                return (tree);
-
-        } else {
-
-            return (tree);
-
+            return tree;
         }
 
-    } else if (tree->pn_func) {
-
-        pn = alloc(struct pnode);
-        pn->pn_use = 0;
-        pn->pn_name = NULL;
-        pn->pn_value = NULL;
-        /* pn_func are pointers to a global constant struct */
-        pn->pn_func = tree->pn_func;
-        pn->pn_op = NULL;
-        pn->pn_left = trcopy(tree->pn_left, args, nn);
-        pn->pn_left->pn_use++;
-        pn->pn_right = NULL;
-        pn->pn_next = NULL;
-
-    } else if (tree->pn_op) {
-
-        pn = alloc(struct pnode);
-        pn->pn_use = 0;
-        pn->pn_name = NULL;
-        pn->pn_value = NULL;
-        pn->pn_func = NULL;
-        /* pn_op are pointers to a global constant struct */
-        pn->pn_op = tree->pn_op;
-        pn->pn_left = trcopy(tree->pn_left, args, nn);
-        pn->pn_left->pn_use++;
-        if (pn->pn_op->op_arity == 2) {
-            pn->pn_right = trcopy(tree->pn_right, args, nn);
-            pn->pn_right->pn_use++;
-        } else {
-            pn->pn_right = NULL;
-        }
-        pn->pn_next = NULL;
-
-    } else {
-        fprintf(cp_err, "trcopy: Internal Error: bad parse node\n");
-        return (NULL);
+        return tree;
     }
 
-    return (pn);
+    if (tree->pn_func) {
+
+        struct pnode *pn = alloc_pnode();
+
+        /* pn_func are pointers to a global constant struct */
+        pn->pn_func = tree->pn_func;
+
+        pn->pn_left = trcopy(tree->pn_left, arg_names, args);
+        pn->pn_left->pn_use++;
+
+        return pn;
+    }
+
+    if (tree->pn_op) {
+
+        struct pnode *pn = alloc_pnode();
+
+        /* pn_op are pointers to a global constant struct */
+        pn->pn_op = tree->pn_op;
+
+        pn->pn_left = trcopy(tree->pn_left, arg_names, args);
+        pn->pn_left->pn_use++;
+
+        if (pn->pn_op->op_arity == 2) {
+            pn->pn_right = trcopy(tree->pn_right, arg_names, args);
+            pn->pn_right->pn_use++;
+        }
+
+        return pn;
+    }
+
+    fprintf(cp_err, "trcopy: Internal Error: bad parse node\n");
+    return NULL;
 }
 
 
@@ -412,33 +369,41 @@ trcopy(struct pnode *tree, char *args, struct pnode *nn)
 static struct pnode *
 ntharg(int num, struct pnode *args)
 {
-    struct pnode *ptry;
-
-    ptry = args;
-
-    if (num > 1)
-        while (--num > 0) {
-            if (ptry && ptry->pn_op &&
-                (ptry->pn_op->op_num != PT_OP_COMMA)) {
-                if (num == 1)
-                    break;
-                else
-                    return (NULL);
-            }
-            ptry = ptry->pn_right;
+    for (; args; args = args->pn_right, --num) {
+        if (num <= 1) {
+            if (args->pn_op && (args->pn_op->op_num == PT_OP_COMMA))
+                return args->pn_left;
+            return args;
         }
+        if (!(args->pn_op && (args->pn_op->op_num == PT_OP_COMMA)))
+            return NULL;
+    }
 
-    if (ptry && ptry->pn_op && (ptry->pn_op->op_num == PT_OP_COMMA))
-        ptry = ptry->pn_left;
+    return NULL;
+}
 
-    return (ptry);
+
+static int
+numargs(struct pnode *args)
+{
+    int arity;
+
+    if (!args)
+        return 0;
+
+    for (arity = 1; args; args = args->pn_right, arity++)
+        if (!(args->pn_op && (args->pn_op->op_num == PT_OP_COMMA)))
+            return arity;
+
+    // note: a trailing NULL pn_right will be counted too
+    return arity;
 }
 
 
 void
 com_undefine(wordlist *wlist)
 {
-    struct udfunc *udf, *ludf;
+    struct udfunc *udf;
 
     if (!wlist)
         return;
@@ -448,8 +413,8 @@ com_undefine(wordlist *wlist)
             struct udfunc *next = udf->ud_next;
             cp_remkword(CT_UDFUNCS, udf->ud_name);
             free_pnode(udf->ud_text);
-            free(udf->ud_name);
-            free(udf);
+            tfree(udf->ud_name);
+            tfree(udf);
             udf = next;
         }
         udfuncs = NULL;
@@ -457,20 +422,20 @@ com_undefine(wordlist *wlist)
     }
 
     for (; wlist; wlist = wlist->wl_next) {
-        ludf = NULL;
+        struct udfunc *prev_udf = NULL;
         for (udf = udfuncs; udf;) {
             struct udfunc *next = udf->ud_next;
             if (eq(wlist->wl_word, udf->ud_name)) {
-                if (ludf)
-                    ludf->ud_next = udf->ud_next;
+                if (prev_udf)
+                    prev_udf->ud_next = udf->ud_next;
                 else
                     udfuncs = udf->ud_next;
                 cp_remkword(CT_UDFUNCS, wlist->wl_word);
                 free_pnode(udf->ud_text);
-                free(udf->ud_name);
-                free(udf);
+                tfree(udf->ud_name);
+                tfree(udf);
             } else {
-                ludf = udf;
+                prev_udf = udf;
             }
             udf = next;
         }
@@ -478,10 +443,8 @@ com_undefine(wordlist *wlist)
 }
 
 
-#ifndef LINT
-
-/* Watch out, this is not at all portable.  It's only here so I can
- * call it from dbx with an int value (all you can give with "call")...
+/*
+ * This is only here so I can "call" it from gdb/dbx
  */
 
 void
@@ -489,5 +452,3 @@ ft_pnode(struct pnode *pn)
 {
     prtree1(pn, cp_err);
 }
-
-#endif

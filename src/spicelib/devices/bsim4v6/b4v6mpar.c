@@ -274,14 +274,14 @@ GENmodel *inMod)
         case BSIM4v6_MOD_NSD:
             mod->BSIM4v6nsd = value->rValue;
             mod->BSIM4v6nsdGiven = TRUE;
-            if (mod->BSIM4v6nsd > 1.0e23)
+            if (mod->BSIM4v6nsd > 1.000001e24)
                 mod->BSIM4v6nsd *= 1.0e-6;
             break;
         case BSIM4v6_MOD_NGATE:
             mod->BSIM4v6ngate = value->rValue;
             mod->BSIM4v6ngateGiven = TRUE;
-	    if (mod->BSIM4v6ngate > 1.0e23)
-		mod->BSIM4v6ngate *= 1.0e-6;
+            if (mod->BSIM4v6ngate > 1.000001e24)
+                mod->BSIM4v6ngate *= 1.0e-6;
             break;
         case BSIM4v6_MOD_GAMMA1:
             mod->BSIM4v6gamma1 = value->rValue;
@@ -3400,6 +3400,26 @@ GENmodel *inMod)
         case BSIM4v6_MOD_VBD_MAX:
             mod->BSIM4v6vbdMax = value->rValue;
             mod->BSIM4v6vbdMaxGiven = TRUE;
+            break;
+        case BSIM4v6_MOD_VGSR_MAX:
+            mod->BSIM4v6vgsrMax = value->rValue;
+            mod->BSIM4v6vgsrMaxGiven = TRUE;
+            break;
+        case BSIM4v6_MOD_VGDR_MAX:
+            mod->BSIM4v6vgdrMax = value->rValue;
+            mod->BSIM4v6vgdrMaxGiven = TRUE;
+            break;
+        case BSIM4v6_MOD_VGBR_MAX:
+            mod->BSIM4v6vgbrMax = value->rValue;
+            mod->BSIM4v6vgbrMaxGiven = TRUE;
+            break;
+        case BSIM4v6_MOD_VBSR_MAX:
+            mod->BSIM4v6vbsrMax = value->rValue;
+            mod->BSIM4v6vbsrMaxGiven = TRUE;
+            break;
+        case BSIM4v6_MOD_VBDR_MAX:
+            mod->BSIM4v6vbdrMax = value->rValue;
+            mod->BSIM4v6vbdrMaxGiven = TRUE;
             break;
 
         case  BSIM4v6_MOD_NMOS  :

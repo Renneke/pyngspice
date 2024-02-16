@@ -4,11 +4,11 @@
  Copyright (C) 2012 Hiroshima University & STARC
 
  MODEL NAME : HiSIM_HV 
- ( VERSION : 1  SUBVERSION : 2  REVISION : 3 )
+ ( VERSION : 1  SUBVERSION : 2  REVISION : 4 )
  Model Parameter VERSION : 1.23
  FILE : hsmhvext.h
 
- DATE : 2012.4.6
+ DATE : 2013.04.30
 
  released by 
                 Hiroshima University &
@@ -18,12 +18,9 @@
 extern int HSMHVacLoad(GENmodel *,CKTcircuit*);
 extern int HSMHVask(CKTcircuit *,GENinstance*,int,IFvalue*,IFvalue*);
 extern int HSMHVconvTest(GENmodel *,CKTcircuit*);
-extern int HSMHVdelete(GENmodel*,IFuid,GENinstance**);
-extern void HSMHVdestroy(GENmodel**);
 extern int HSMHVgetic(GENmodel*,CKTcircuit*);
 extern int HSMHVload(GENmodel*,CKTcircuit*);
 extern int HSMHVmAsk(CKTcircuit*,GENmodel *,int, IFvalue*);
-extern int HSMHVmDelete(GENmodel**,IFuid,GENmodel*);
 extern int HSMHVmParam(int,IFvalue*,GENmodel*);
 extern void HSMHVmosCap(CKTcircuit*, double, double, double, double*,
         double, double, double, double, double, double,

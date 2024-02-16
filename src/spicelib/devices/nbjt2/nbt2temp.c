@@ -33,7 +33,7 @@ NBJT2temp(GENmodel *inModel, CKTcircuit *ckt)
 
 
   /* loop through all the models */
-  for (; model != NULL; model = model->NBJT2nextModel) {
+  for (; model != NULL; model = NBJT2nextModel(model)) {
     methods = model->NBJT2methods;
     models = model->NBJT2models;
     options = model->NBJT2options;
@@ -55,8 +55,8 @@ NBJT2temp(GENmodel *inModel, CKTcircuit *ckt)
     MatchingMobility = models->MODLmatchingMobility;
     OneCarrier = methods->METHoneCarrier;
 
-    for (inst = model->NBJT2instances; inst != NULL;
-	inst = inst->NBJT2nextInstance) {
+    for (inst = NBJT2instances(model); inst != NULL;
+         inst = NBJT2nextInstance(inst)) {
 
       startTime = SPfrontEnd->IFseconds();
 
@@ -82,7 +82,7 @@ NBJT2temp(GENmodel *inModel, CKTcircuit *ckt)
 
 	/* Copy everything, then fix the incorrect pointer. */
 	pNextMaterial = pMaterial->next;
-	bcopy(pM, pMaterial, sizeof(TWOmaterial));
+	memcpy(pMaterial, pM, sizeof(TWOmaterial));
 	pMaterial->next = pNextMaterial;
 
 	/* Now do the temperature dependence. */

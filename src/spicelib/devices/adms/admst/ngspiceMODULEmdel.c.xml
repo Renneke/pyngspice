@@ -40,51 +40,24 @@
 <admst:template match="code">
 <admst:value-of select="attribute[name='ngspicename']/value"/>
 <admst:variable name="module" select="%s"/>
-
 #include &quot;ngspice/ngspice.h&quot;
 #include &quot;$(module)defs.h&quot;
 #include &quot;ngspice/sperror.h&quot;
 #include &quot;ngspice/suffix.h&quot;
 
-int $(module)mDelete(GENmodel **inModel, IFuid modname, GENmodel *kill)
-
+int
+$(module)mDelete(GENmodel *gen_model)
 {
-  register $(module)model **model = ($(module)model**)inModel;
-  register $(module)model *modfast =($(module)model*)kill;
-  $(module)instance *here;
-  $(module)instance *prev = NULL;
-  $(module)model **oldmod;
-  
-  oldmod = model;
-  for ( ; *model ; model = &amp;((*model)->$(module)nextModel)) {
-      if ((*model)->$(module)modName == modname ||
-          (modfast &amp;&amp; *model == modfast))
-	  goto delgot;
-      oldmod = model;   
-  } 
-  return(E_NOMOD);
-  
-  delgot:
-    *oldmod = (*model)->$(module)nextModel; /* cut deleted device out of list */
-    for (here = (*model)->$(module)instances; here; here = here->$(module)nextInstance)
-    {    if(prev) FREE(prev);
-         prev = here;
-    }
-    if(prev) FREE(prev);
-    FREE(*model);
-    return(OK);
+    NG_IGNORE(gen_model);
+    return OK;
 }
-
 </admst:template>
 
 <admst:for-each select="/module">
   <admst:value-of select="attribute[name='ngspicename']/value"/>
   <admst:open file="%smdel.c">
-    <admst:value-of select="/simulator/package_string"/>
-    <admst:text format="/***\n*** Interface: %s\n"/>
-    <admst:value-of select="/simulator/currentdate"/>
-    <admst:value-of select="/simulator/fullname"/>
-    <admst:text format=" *** created by: %s - %s ***/\n"/>
+    <admst:text format="/***\n*** Interface: %(/simulator/package_string)\n"/>
+    <admst:text format=" *** created by: %(/simulator/fullname) ***/\n"/>
     <admst:apply-templates select="." match="code"/>
   </admst:open>
   <admst:value-of select="attribute[name='ngspicename']/value"/>

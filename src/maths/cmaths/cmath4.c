@@ -60,15 +60,13 @@ cx_and(void *data1, void *data2, short int datatype1, short int datatype2, int l
                 realpart(c1) = dd1[i];
                 imagpart(c1) = 0.0;
             } else {
-                realpart(c1) = realpart(cc1[i]);
-                imagpart(c1) = imagpart(cc1[i]);
+                c1 = cc1[i];
             }
             if (datatype2 == VF_REAL) {
                 realpart(c2) = dd2[i];
                 imagpart(c2) = 0.0;
             } else {
-                realpart(c2) = realpart(cc2[i]);
-                imagpart(c2) = imagpart(cc2[i]);
+                c2 = cc2[i];
             }
             d[i] = ((realpart(c1) && realpart(c2)) &&
                 (imagpart(c1) && imagpart(c2)));
@@ -99,15 +97,13 @@ cx_or(void *data1, void *data2, short int datatype1, short int datatype2, int le
                 realpart(c1) = dd1[i];
                 imagpart(c1) = 0.0;
             } else {
-                realpart(c1) = realpart(cc1[i]);
-                imagpart(c1) = imagpart(cc1[i]);
+                c1 = cc1[i];
             }
             if (datatype2 == VF_REAL) {
                 realpart(c2) = dd2[i];
                 imagpart(c2) = 0.0;
             } else {
-                realpart(c2) = realpart(cc2[i]);
-                imagpart(c2) = imagpart(cc2[i]);
+                c2 = cc2[i];
             }
             d[i] = ((realpart(c1) || realpart(c2)) &&
                 (imagpart(c1) || imagpart(c2)));
@@ -217,7 +213,7 @@ cx_interpolate(void *data, short int type, int length, int *newlength, short int
     *newlength = ns->v_length;
     d = alloc_d(ns->v_length);
 
-    if (!cp_getvar("polydegree", CP_NUM, &degree))
+    if (!cp_getvar("polydegree", CP_NUM, &degree, 0))
         degree = 1;
 
     for (base = 0; base < length; base += grouping) {
@@ -252,7 +248,7 @@ cx_deriv(void *data, short int type, int length, int *newlength, short int *newt
         return (NULL);
     }
 
-    if (!cp_getvar("dpolydegree", CP_NUM, &degree))
+    if (!cp_getvar("dpolydegree", CP_NUM, &degree, 0))
         degree = 2; /* default quadratic */
 
     n = degree + 1;
@@ -273,7 +269,7 @@ cx_deriv(void *data, short int type, int length, int *newlength, short int *newt
         c_indata = (ngcomplex_t *) data;
         c_outdata = alloc_c(length);
         scale = alloc_d(length);        /* XXX */
-        if (pl->pl_scale->v_type == VF_COMPLEX)
+        if (iscomplex(pl->pl_scale))
             /* Not ideal */
             for (i = 0; i < length; i++)
                 scale[i] = realpart(pl->pl_scale->v_compdata[i]);
@@ -339,6 +335,8 @@ cx_deriv(void *data, short int type, int length, int *newlength, short int *newt
         tfree(r_coefs);
         tfree(i_coefs);
         tfree(scale);
+        tfree(spare);
+        tfree(scratch);
         return (void *) c_outdata;
 
     }
@@ -369,7 +367,7 @@ cx_deriv(void *data, short int type, int length, int *newlength, short int *newt
         */
 
         /* Modified to deal with complex frequency vector */
-        if (pl->pl_scale->v_type == VF_COMPLEX)
+        if (iscomplex(pl->pl_scale))
             for (i = 0; i < length; i++)
                 scale[i] = realpart(pl->pl_scale->v_compdata[i]);
         else
@@ -398,7 +396,7 @@ cx_deriv(void *data, short int type, int length, int *newlength, short int *newt
                      * abort.
                      */
 
-                    if (pl->pl_scale->v_type == VF_COMPLEX)
+                    if (iscomplex(pl->pl_scale))
                         x = realpart(pl->pl_scale->v_compdata[j+base]);  /* For complex scale vector */
                     else
                         x = pl->pl_scale->v_realdata[j + base];           /* For real scale vector */
@@ -412,7 +410,7 @@ cx_deriv(void *data, short int type, int length, int *newlength, short int *newt
             {
                 /* Again the same error */
                         /* x = pl->pl_scale->v_realdata[j + base]; */
-                if (pl->pl_scale->v_type == VF_COMPLEX)
+                if (iscomplex(pl->pl_scale))
                     x = realpart(pl->pl_scale->v_compdata[j+base]);  /* For complex scale vector */
                 else
                     x = pl->pl_scale->v_realdata[j + base];           /* For real scale vector */
@@ -423,7 +421,9 @@ cx_deriv(void *data, short int type, int length, int *newlength, short int *newt
 
 
         tfree(coefs);
-        tfree(scale);        /* XXX */
+        tfree(scale);
+        tfree(spare);
+        tfree(scratch);
         return (char *) outdata;
     }
 
@@ -582,7 +582,7 @@ cx_fft(void *data, short int type, int length, int *newlength, short int *newtyp
     } else if (pl->pl_scale->v_type == SV_FREQUENCY) { /* take frequency from ac data and calculate time */
 
         /* Deal with complex frequency vector */
-        if (pl->pl_scale->v_type == VF_COMPLEX) {
+        if (iscomplex(pl->pl_scale)) {
             span = realpart(pl->pl_scale->v_compdata[pl->pl_scale->v_length-1]) - realpart(pl->pl_scale->v_compdata[0]);
             for (i = 0; i<pl->pl_scale->v_length; i++)
                 xscale[i] = realpart(pl->pl_scale->v_compdata[i]);
@@ -615,9 +615,9 @@ cx_fft(void *data, short int type, int length, int *newlength, short int *newtyp
 
     win = TMALLOC(double, length);
     maxt = time[length-1];
-    if (!cp_getvar("specwindow", CP_STRING, window))
+    if (!cp_getvar("specwindow", CP_STRING, window, sizeof(window)))
         strcpy(window, "none");
-    if (!cp_getvar("specwindoworder", CP_NUM, &order))
+    if (!cp_getvar("specwindoworder", CP_NUM, &order, 0))
         order = 2;
     if (order < 2)
         order = 2;
@@ -626,13 +626,10 @@ cx_fft(void *data, short int type, int length, int *newlength, short int *newtyp
         goto done;
 
     /* create a new scale vector */
-    sv = alloc(struct dvec);
-    ZERO(sv, struct dvec);
-    sv->v_name = copy("fft_scale");
-    sv->v_type = SV_FREQUENCY;
-    sv->v_flags = (VF_REAL | VF_PERMANENT | VF_PRINT);
-    sv->v_length = fpts;
-    sv->v_realdata = xscale;
+    sv = dvec_alloc(copy("fft_scale"),
+                    SV_FREQUENCY,
+                    VF_REAL | VF_PERMANENT | VF_PRINT,
+                    fpts, xscale);
     vec_new(sv);
 
     if (type == VF_COMPLEX) { /* input vector is complex */
@@ -719,7 +716,7 @@ cx_fft(void *data, short int type, int length, int *newlength, short int *newtyp
 
         fftw_execute(plan_forward);
 
-        scale = (double) length;
+        scale = (double) fpts - 1.0;
         for (i = 0; i < fpts; i++) {
             outdata[i].cx_real = out[i][0]/scale;
             outdata[i].cx_imag = out[i][1]/scale;
@@ -743,7 +740,7 @@ cx_fft(void *data, short int type, int length, int *newlength, short int *newtyp
         rffts(datax, M, 1);
         fftFree();
 
-        scale = (double) N;
+        scale = (double) fpts - 1.0;
         /* Re(x[0]), Re(x[N/2]), Re(x[1]), Im(x[1]), Re(x[2]), Im(x[2]), ... Re(x[N/2-1]), Im(x[N/2-1]). */
         outdata[0].cx_real = datax[0]/scale;
         outdata[0].cx_imag = 0.0;
@@ -836,7 +833,7 @@ cx_ifft(void *data, short int type, int length, int *newlength, short int *newty
         xscale = TMALLOC(double, tpts);
 
         /* Deal with complex frequency vector */
-        if (pl->pl_scale->v_type == VF_COMPLEX)
+        if (iscomplex(pl->pl_scale))
             span = realpart(pl->pl_scale->v_compdata[tpts-1]) - realpart(pl->pl_scale->v_compdata[0]);
         else
             span = pl->pl_scale->v_realdata[tpts-1] - pl->pl_scale->v_realdata[0];
@@ -863,13 +860,10 @@ cx_ifft(void *data, short int type, int length, int *newlength, short int *newty
     span = xscale[tpts-1] - xscale[0];
 
     /* create a new scale vector */
-    sv = alloc(struct dvec);
-    ZERO(sv, struct dvec);
-    sv->v_name = copy("ifft_scale");
-    sv->v_type = SV_TIME;
-    sv->v_flags = (VF_REAL | VF_PERMANENT | VF_PRINT);
-    sv->v_length = tpts;
-    sv->v_realdata = xscale;
+    sv = dvec_alloc(copy("ifft_scale"),
+                    SV_TIME,
+                    VF_REAL | VF_PERMANENT | VF_PRINT,
+                    tpts, xscale);
     vec_new(sv);
 
     *newtype = VF_COMPLEX;

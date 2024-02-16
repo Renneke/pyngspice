@@ -13,6 +13,7 @@ Modified by Paolo Nenzi 2003 and Dietmar Warning 2012
 #include "ngspice/const.h"
 #include "ngspice/sperror.h"
 #include "ngspice/suffix.h"
+#include "ngspice/cpdefs.h"
 
 int
 DIOtemp(GENmodel *inModel, CKTcircuit *ckt)
@@ -28,47 +29,52 @@ DIOtemp(GENmodel *inModel, CKTcircuit *ckt)
     double vtnom;
     DIOinstance *here;
     int iter;
-#ifdef TRACE
-    char *emsg;
-#endif
     double dt;
     double factor;
     double tBreakdownVoltage;
 
+    double gclimit;
+
+    if (!cp_getvar("DIOgradingCoeffMax", CP_REAL, &gclimit, 0))
+        gclimit = 0.9;
+
     /*  loop through all the diode models */
-    for( ; model != NULL; model = model->DIOnextModel ) {
+    for( ; model != NULL; model = DIOnextModel(model)) {
         if(!model->DIOnomTempGiven) {
             model->DIOnomTemp = ckt->CKTnomTemp;
         }
         vtnom = CONSTKoverQ * model->DIOnomTemp;
-        /* limit grading coeff to max of .9 */
-        if(model->DIOgradingCoeff>.9) {
-            SPfrontEnd->IFerror (ERR_WARNING,
-                    "%s: grading coefficient too large, limited to 0.9",
-                    &(model->DIOmodName));
-            model->DIOgradingCoeff=.9;
+        /* limit grading coeff to max of .9, set new limit with variable DIOgradingCoeffMax */
+        if(model->DIOgradingCoeff>gclimit) {
+            SPfrontEnd->IFerrorf (ERR_WARNING,
+                    "%s: grading coefficient too large, limited to %g",
+                    model->DIOmodName, gclimit);
+            model->DIOgradingCoeff=gclimit;
         }
         /* limit activation energy to min of .1 */
         if(model->DIOactivationEnergy<.1) {
-            SPfrontEnd->IFerror (ERR_WARNING,
+            SPfrontEnd->IFerrorf (ERR_WARNING,
                     "%s: activation energy too small, limited to 0.1",
-                    &(model->DIOmodName));
+                    model->DIOmodName);
             model->DIOactivationEnergy=.1;
         }
         /* limit depletion cap coeff to max of .95 */
         if(model->DIOdepletionCapCoeff>.95) {
-            SPfrontEnd->IFerror (ERR_WARNING,
+            SPfrontEnd->IFerrorf (ERR_WARNING,
                     "%s: coefficient Fc too large, limited to 0.95",
-                    &(model->DIOmodName));
+                    model->DIOmodName);
             model->DIOdepletionCapCoeff=.95;
         }
         /* limit sidewall depletion cap coeff to max of .95 */
         if(model->DIOdepletionSWcapCoeff>.95) {
-            SPfrontEnd->IFerror (ERR_WARNING,
+            SPfrontEnd->IFerrorf (ERR_WARNING,
                     "%s: coefficient Fcs too large, limited to 0.95",
-                    &(model->DIOmodName));
+                    model->DIOmodName);
             model->DIOdepletionSWcapCoeff=.95;
         }
+        /* set lower limit of saturation current */
+        if (model->DIOsatCur < ckt->CKTepsmin)
+            model->DIOsatCur = ckt->CKTepsmin;
         if((!model->DIOresistGiven) || (model->DIOresist==0)) {
             model->DIOconductance = 0.0;
         } else {
@@ -77,7 +83,7 @@ DIOtemp(GENmodel *inModel, CKTcircuit *ckt)
         xfc=log(1-model->DIOdepletionCapCoeff);
         xfcs=log(1-model->DIOdepletionSWcapCoeff);
 
-        for(here=model->DIOinstances;here;here=here->DIOnextInstance) {
+        for(here=DIOinstances(model);here;here=DIOnextInstance(here)) {
             double egfet1,arg1,fact1,pbfact1,pbo,gmaold,pboSW,gmaSWold;
             double fact2,pbfact,arg,egfet,gmanew,gmaSWnew;
             /* loop through all the instances */
@@ -95,13 +101,13 @@ DIOtemp(GENmodel *inModel, CKTcircuit *ckt)
             here->DIOtGradingCoeff = model->DIOgradingCoeff * factor;
 
             /* limit temperature adjusted grading coeff
-             * to max of .9
+             * to max of .9, or set new limit with variable DIOgradingCoeffMax
              */
-            if(here->DIOtGradingCoeff>.9) {
-              SPfrontEnd->IFerror (ERR_WARNING,
-                    "%s: temperature adjusted grading coefficient too large, limited to 0.9",
-                    &(here->DIOname));
-              here->DIOtGradingCoeff=.9;
+            if(here->DIOtGradingCoeff>gclimit) {
+              SPfrontEnd->IFerrorf (ERR_WARNING,
+                    "%s: temperature adjusted grading coefficient too large, limited to %g",
+                    here->DIOname, gclimit);
+              here->DIOtGradingCoeff=gclimit;
             }
 
             vt = CONSTKoverQ * here->DIOtemp;
@@ -133,7 +139,7 @@ DIOtemp(GENmodel *inModel, CKTcircuit *ckt)
             } else if (model->DIOtlevc == 1) {
                     here->DIOtJctPot = model->DIOjunctionPot - model->DIOtpb*(here->DIOtemp-REFTEMP);
                     here->DIOtJctCap = here->DIOjunctionCap *
-                            (model->DIOcta*(here->DIOtemp-REFTEMP));
+                            (1+model->DIOcta*(here->DIOtemp-REFTEMP));
             }
 
             if (model->DIOtlevc == 0) {
@@ -149,7 +155,7 @@ DIOtemp(GENmodel *inModel, CKTcircuit *ckt)
             } else if (model->DIOtlevc == 1) {
                     here->DIOtJctSWPot = model->DIOjunctionSWPot - model->DIOtphp*(here->DIOtemp-REFTEMP);
                     here->DIOtJctSWCap = here->DIOjunctionSWCap *
-                            (model->DIOctp*(here->DIOtemp-REFTEMP));
+                            (1+model->DIOctp*(here->DIOtemp-REFTEMP));
             }
 
             here->DIOtSatCur = model->DIOsatCur * here->DIOarea * exp(
@@ -174,6 +180,12 @@ DIOtemp(GENmodel *inModel, CKTcircuit *ckt)
                     model->DIOtunSaturationCurrentExp *
                     log(here->DIOtemp/model->DIOnomTemp) );
 
+            here->DIOtRecSatCur = model->DIOrecSatCur * here->DIOarea * exp(
+                    ((here->DIOtemp/model->DIOnomTemp)-1) *
+                    model->DIOactivationEnergy/(model->DIOrecEmissionCoeff*vt) +
+                    model->DIOsaturationCurrentExp/model->DIOrecEmissionCoeff *
+                    log(here->DIOtemp/model->DIOnomTemp) );
+
             /* the defintion of f1, just recompute after temperature adjusting
              * all the variables used in it */
             here->DIOtF1=here->DIOtJctPot*
@@ -182,10 +194,29 @@ DIOtemp(GENmodel *inModel, CKTcircuit *ckt)
             /* same for Depletion Capacitance */
             here->DIOtDepCap=model->DIOdepletionCapCoeff*
                     here->DIOtJctPot;
+            here->DIOtDepSWCap=model->DIOdepletionSWcapCoeff*
+                    here->DIOtJctSWPot;
             /* and Vcrit */
             vte=model->DIOemissionCoeff*vt;
 
             here->DIOtVcrit = vte * log(vte/(CONSTroot2*here->DIOtSatCur));
+
+            /* limit junction potential to max of 1/FC */
+            if(here->DIOtDepCap > 1.0) {
+                here->DIOtJctPot=1.0/model->DIOdepletionCapCoeff;
+                here->DIOtDepCap=model->DIOdepletionCapCoeff*here->DIOtJctPot;
+                SPfrontEnd->IFerrorf (ERR_WARNING,
+                        "%s: junction potential VJ too large, limited to %f",
+                        model->DIOmodName, here->DIOtJctPot);
+            }
+            /* limit sidewall junction potential to max of 1/FCS */
+            if(here->DIOtDepSWCap > 1.0) {
+                here->DIOtJctSWPot=1.0/model->DIOdepletionSWcapCoeff;
+                here->DIOtDepSWCap=model->DIOdepletionSWcapCoeff*here->DIOtJctSWPot;
+                SPfrontEnd->IFerrorf (ERR_WARNING,
+                        "%s: junction potential VJS too large, limited to %f",
+                        model->DIOmodName, here->DIOtJctSWPot);
+            }
 
             /* and now to compute the breakdown voltage, again, using
              * temperature adjusted basic parameters */
@@ -203,15 +234,9 @@ DIOtemp(GENmodel *inModel, CKTcircuit *ckt)
                 if (cbv < here->DIOtSatCur * tBreakdownVoltage/vt) {
                     cbv=here->DIOtSatCur * tBreakdownVoltage/vt;
 #ifdef TRACE
-                    emsg = TMALLOC(char, 100);
-                    if(emsg == NULL) return(E_NOMEM);
-                    (void)sprintf(emsg,
-                    "%%s: breakdown current increased to %g to resolve",
-                            cbv);
-                    SPfrontEnd->IFerror (ERR_WARNING, emsg, &(here->DIOname));
-                    FREE(emsg);
-                    SPfrontEnd->IFerror (ERR_WARNING,
-                    "incompatibility with specified saturation current", NULL);
+                    SPfrontEnd->IFerrorf (ERR_WARNING, "%s: breakdown current increased to %g to resolve", here->DIOname, cbv);
+                    SPfrontEnd->IFerrorf (ERR_WARNING,
+                    "incompatibility with specified saturation current");
 #endif
                     xbv=tBreakdownVoltage;
                 } else {
@@ -227,13 +252,7 @@ DIOtemp(GENmodel *inModel, CKTcircuit *ckt)
                         if (fabs(xcbv-cbv) <= tol) goto matched;
                     }
 #ifdef TRACE
-                    emsg = TMALLOC(char, 100);
-                    if(emsg == NULL) return(E_NOMEM);
-                    (void)sprintf(emsg,
-                    "%%s: unable to match forward and reverse diode regions: bv = %g, ibv = %g",
-                            xbv,xcbv);
-                    SPfrontEnd->IFerror (ERR_WARNING, emsg, &here->DIOname);
-                    FREE(emsg);
+                    SPfrontEnd->IFerrorf (ERR_WARNING, "%s: unable to match forward and reverse diode regions: bv = %g, ibv = %g", here->DIOname, xbv, xcbv);
 #endif
                 }
                 matched:

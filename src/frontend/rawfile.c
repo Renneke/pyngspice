@@ -12,10 +12,14 @@ Author: 1986 Wayne A. Christopher, U. C. Berkeley CAD Group
 #include "ngspice/ftedefs.h"
 #include "dimens.h"
 #include "ngspice/dvec.h"
+#include "ngspice/sim.h"
+#include "ngspice/stringskip.h"
 
 #include "rawfile.h"
 #include "variable.h"
 #include "../misc/misc_time.h"
+
+#include "ngspice/compatmode.h"
 
 
 static void fixdims(struct dvec *v, char *s);
@@ -31,10 +35,10 @@ int raw_prec = -1;        /* How many sigfigs to use, default 15 (max).  */
 #endif
 
 
-/* Write a raw file.  We write everything in the plot pointed to. */
-
-void
-raw_write(char *name, struct plot *pl, bool app, bool binary)
+/* Write a raw file with the 'write' command.  We write everything in the plot pointed to.
+   Writing a raw file in batch mode is handled by fileInit_pass1() and fileInit_pass2()
+   in outitf.c */
+void raw_write(char *name, struct plot *pl, bool app, bool binary)
 {
     FILE *fp;
     bool realflag = TRUE, writedims;
@@ -48,7 +52,7 @@ raw_write(char *name, struct plot *pl, bool app, bool binary)
     char buf[BSIZE_SP];
     char *branch;
 
-    raw_padding = !cp_getvar("nopadding", CP_BOOL, NULL);
+    raw_padding = !cp_getvar("nopadding", CP_BOOL, NULL, 0);
 
     /* Why bother printing out an empty plot? */
     if (!pl->pl_dvecs) {
@@ -56,12 +60,12 @@ raw_write(char *name, struct plot *pl, bool app, bool binary)
         return;
     }
 
-    if (raw_prec != -1)
+    if (raw_prec != -1) {
         prec = raw_prec;
-    else
+    }
+    else {
         prec = DEFPREC;
-
-#if defined(__MINGW32__) || defined(_MSC_VER)
+    }
 
     /* - Binary file binary write -  hvogt 15.03.2000 ---------------------*/
     if (binary) {
@@ -69,29 +73,22 @@ raw_write(char *name, struct plot *pl, bool app, bool binary)
             perror(name);
             return;
         }
-        fprintf(cp_out, "binary raw file\n");
-    } else {
+        fprintf(cp_out, "binary raw file \"%s\"\n", name);
+    }
+    else {
         if ((fp = fopen(name, app ? "a" : "w")) == NULL) {
             perror(name);
             return;
         }
-        fprintf(cp_out, "ASCII raw file\n");
+        fprintf(cp_out, "ASCII raw file \"%s\"\n", name);
     }
     /* --------------------------------------------------------------------*/
 
-#else
-
-    if (!(fp = fopen(name, app ? "a" : "w"))) {
-        perror(name);
-        return;
-    }
-
-#endif
-
     numdims = nvars = length = 0;
     for (v = pl->pl_dvecs; v; v = v->v_next) {
-        if (iscomplex(v))
+        if (iscomplex(v)) {
             realflag = FALSE;
+        }
         nvars++;
         /* Find the length and dimensions of the longest vector
          * in the plot.
@@ -123,20 +120,24 @@ raw_write(char *name, struct plot *pl, bool app, bool binary)
         fprintf(fp, "Dimensions: %s\n", buf);
     }
 
-    for (wl = pl->pl_commands; wl; wl = wl->wl_next)
+    for (wl = pl->pl_commands; wl; wl = wl->wl_next) {
         fprintf(fp, "Command: %s\n", wl->wl_word);
+    }
 
     for (vv = pl->pl_env; vv; vv = vv->va_next) {
         wl = cp_varwl(vv);
         if (vv->va_type == CP_BOOL) {
             fprintf(fp, "Option: %s\n", vv->va_name);
-        } else {
+        }
+        else {
             fprintf(fp, "Option: %s = ", vv->va_name);
-            if (vv->va_type == CP_LIST)
+            if (vv->va_type == CP_LIST) {
                 fprintf(fp, "( ");
+            }
             wl_print(wl, fp);
-            if (vv->va_type == CP_LIST)
+            if (vv->va_type == CP_LIST) {
                 fprintf(fp, " )");
+            }
             (void) putc('\n', fp);
         }
     }
@@ -144,8 +145,9 @@ raw_write(char *name, struct plot *pl, bool app, bool binary)
     /* Before we write the stuff out, make sure that the scale is the first
      * in the list.
      */
-    for (lv = NULL, v = pl->pl_dvecs; v != pl->pl_scale; v = v->v_next)
+    for (lv = NULL, v = pl->pl_dvecs; v != pl->pl_scale; v = v->v_next) {
         lv = v;
+    }
     if (lv) {
         lv->v_next = v->v_next;
         v->v_next = pl->pl_dvecs;
@@ -154,33 +156,54 @@ raw_write(char *name, struct plot *pl, bool app, bool binary)
 
     fprintf(fp, "Variables:\n");
     for (i = 0, v = pl->pl_dvecs; v; v = v->v_next) {
-        if (strcmp(ft_typenames(v->v_type), "current") == 0) {
+        /* write i(name) instaed of name#branch */
+        if (v->v_type == SV_CURRENT) {
             branch = NULL;
+            /* get name only*/
             if ((branch = strstr(v->v_name, "#branch")) != NULL) {
                 *branch = '\0';
             }
-            fprintf(fp, "\t%d\ti(%s)\t%s", i++, v->v_name, ft_typenames(v->v_type));
+            /* If the branch name is a number, the vector is already called i(name) */
+            if (ciprefix("i(", v->v_name))
+                fprintf(fp, "\t%d\t%s\t%s", i++, v->v_name, ft_typenames(v->v_type));
+            else
+                fprintf(fp, "\t%d\ti(%s)\t%s", i++, v->v_name, ft_typenames(v->v_type));
+            /* restore name#branch */
             if (branch != NULL) *branch = '#';
-        } else if (strcmp(ft_typenames(v->v_type), "voltage") == 0) {
-            fprintf(fp, "\t%d\t%s\t%s", i++, v->v_name, ft_typenames(v->v_type));
-        } else {
+        }
+        /* write v(name)*/
+        else if (v->v_type == SV_VOLTAGE) {
+            /* If the node name is a number, the vector is already called v(name) */
+            if (ciprefix("v(", v->v_name) || newcompat.eg) /* FIXME: newcompat.eg should be removed if EAGLE is updated */
+               fprintf(fp, "\t%d\t%s\t%s", i++, v->v_name, ft_typenames(v->v_type));
+            else
+               fprintf(fp, "\t%d\tv(%s)\t%s", i++, v->v_name, ft_typenames(v->v_type));
+        }
+        /* write 'name' only for all other vector types */
+        else {
             fprintf(fp, "\t%d\t%s\t%s", i++, v->v_name, ft_typenames(v->v_type));
         }
-        if (v->v_flags & VF_MINGIVEN)
+        if (v->v_flags & VF_MINGIVEN) {
             fprintf(fp, " min=%e", v->v_minsignal);
-        if (v->v_flags & VF_MAXGIVEN)
+        }
+        if (v->v_flags & VF_MAXGIVEN) {
             fprintf(fp, " max=%e", v->v_maxsignal);
-        if (v->v_defcolor)
+        }
+        if (v->v_defcolor) {
             fprintf(fp, " color=%s", v->v_defcolor);
-        if (v->v_gridtype)
+        }
+        if (v->v_gridtype) {
             fprintf(fp, " grid=%d", v->v_gridtype);
-        if (v->v_plottype)
+        }
+        if (v->v_plottype) {
             fprintf(fp, " plot=%d", v->v_plottype);
+        }
         /* Only write dims if they are different from default. */
         writedims = FALSE;
         if (v->v_numdims != numdims) {
             writedims = TRUE;
-        } else {
+        }
+        else {
             for (j = 0; j < numdims; j++)
                 if (dims[j] != v->v_dims[j])
                     writedims = TRUE;
@@ -202,58 +225,70 @@ raw_write(char *name, struct plot *pl, bool app, bool binary)
                         dd = (isreal(v) ? v->v_realdata[i] :
                               realpart(v->v_compdata[i]));
                         (void) fwrite(&dd, sizeof(double), 1, fp);
-                    } else if (isreal(v)) {
+                    }
+                    else if (isreal(v)) {
                         dd = v->v_realdata[i];
                         (void) fwrite(&dd, sizeof(double), 1, fp);
                         dd = 0.0;
                         (void) fwrite(&dd, sizeof(double), 1, fp);
-                    } else {
+                    }
+                    else {
                         dd = realpart(v->v_compdata[i]);
                         (void) fwrite(&dd, sizeof(double), 1, fp);
                         dd = imagpart(v->v_compdata[i]);
                         (void) fwrite(&dd, sizeof(double), 1, fp);
                     }
-                } else if (raw_padding) {
+                }
+                else if (raw_padding) {
                     dd = 0.0;
                     if (realflag) {
                         (void) fwrite(&dd, sizeof(double), 1, fp);
-                    } else {
+                    }
+                    else {
                         (void) fwrite(&dd, sizeof(double), 1, fp);
                         (void) fwrite(&dd, sizeof(double), 1, fp);
                     }
                 }
             }
         }
-    } else {
+    }
+    else {
         fprintf(fp, "Values:\n");
         for (i = 0; i < length; i++) {
             fprintf(fp, " %d", i);
             for (v = pl->pl_dvecs; v; v = v->v_next) {
                 if (i < v->v_length) {
-                    if (realflag)
+                    if (realflag) {
                         fprintf(fp, "\t%.*e\n", prec,
                                 isreal(v) ? v->v_realdata[i] :
                                 realpart(v->v_compdata[i]));
-                    else if (isreal(v))
+                    }
+                    else if (isreal(v)) {
                         fprintf(fp, "\t%.*e,0.0\n", prec,
                                 v->v_realdata[i]);
-                    else
+                    }
+                    else {
                         fprintf(fp, "\t%.*e,%.*e\n", prec,
                                 realpart(v->v_compdata[i]),
                                 prec,
                                 imagpart(v->v_compdata[i]));
-                } else if (raw_padding) {
-                    if (realflag)
+                    }
+                }
+                else if (raw_padding) {
+                    if (realflag) {
                         fprintf(fp, "\t%.*e\n", prec, 0.0);
-                    else
+                    }
+                    else {
                         fprintf(fp, "\t%.*e,%.*e\n", prec, 0.0, prec, 0.0);
+                    }
                 }
             }
             (void) putc('\n', fp);
         }
     }
     (void) fclose(fp);
-}
+} /* end of function raw_write */
+
 
 
 /* Read a raw file.  Returns a list of plot structures.  This routine should be
@@ -263,12 +298,7 @@ raw_write(char *name, struct plot *pl, bool app, bool binary)
  */
 
 #define SKIP(s)                                 \
-    do {                                        \
-        while (*(s) && !isspace(*(s)))          \
-            (s)++;                              \
-        while (isspace(*(s)))                   \
-            (s)++;                              \
-    } while(0)
+    skip_ws(skip_non_ws(s))
 
 #define NONL(s)                                 \
     do {                                        \
@@ -291,10 +321,10 @@ raw_write(char *name, struct plot *pl, bool app, bool binary)
 
 struct plot *
 raw_read(char *name) {
-    char *title = "default title";
-    char *date = 0;
+    char *title = NULL;
+    char *date = NULL;
     struct plot *plots = NULL, *curpl = NULL;
-    char buf[BSIZE_SP], buf2[BSIZE_SP], *s, *t, *r;
+    char buf[BSIZE_SP], *s, *t, *r;
     int flags = 0, nvars = 0, npoints = 0, i, j;
     int ndimpoints, numdims = 0, dims[MAXDIMS];
     bool raw_padded = TRUE, is_ascii = FALSE;
@@ -307,7 +337,7 @@ raw_read(char *name) {
 
     if ((fp = fopen(name, "rb")) == NULL) {
         perror(name);
-        controlled_exit(EXIT_FAILURE);
+        return NULL;
     }
 
     /* Since we call cp_evloop() from here, we have to do this junk. */
@@ -328,18 +358,17 @@ raw_read(char *name) {
         }
         /* Figure out what this line is... */
         if (ciprefix("title:", buf)) {
-            s = buf;
-            SKIP(s);
+            s = SKIP(buf);
             NONL(s);
             title = copy(s);
         } else if (ciprefix("date:", buf)) {
-            s = buf;
-            SKIP(s);
+            s = SKIP(buf);
             NONL(s);
             date = copy(s);
+        } else if (ciprefix("offset:", buf)) {
+            fprintf(cp_err, "Warning: Offset: is not supported\n");
         } else if (ciprefix("plotname:", buf)) {
-            s = buf;
-            SKIP(s);
+            s = SKIP(buf);
             NONL(s);
             if (curpl) {    /* reverse commands list */
                 for (wl = curpl->pl_commands, curpl->pl_commands = NULL;
@@ -351,19 +380,22 @@ raw_read(char *name) {
                     curpl->pl_commands = wl;
                 }
             }
-            curpl = alloc(struct plot);
+            curpl = TMALLOC(struct plot, 1);
             curpl->pl_next = plots;
             plots = curpl;
             curpl->pl_name = copy(s);
             if (!date)
                 date = copy(datestring());
             curpl->pl_date = date;
-            curpl->pl_title = copy(title);
+            if (!title)
+                title = copy("default title");
+            curpl->pl_title = title;
+            date = NULL;
+            title = NULL;
             flags = VF_PERMANENT;
             nvars = npoints = 0;
         } else if (ciprefix("flags:", buf)) {
-            s = buf;
-            SKIP(s);
+            s = SKIP(buf);
             while ((t = gettok(&s)) != NULL) {
                 if (cieq(t, "real"))
                     flags |= VF_REAL;
@@ -377,14 +409,12 @@ raw_read(char *name) {
                     fprintf(cp_err, "Warning: unknown flag %s\n", t);
             }
         } else if (ciprefix("no. variables:", buf)) {
-            s = buf;
-            SKIP(s);
-            SKIP(s);
+            s = SKIP(buf);
+            s = SKIP(s);
             nvars = scannum(s);
         } else if (ciprefix("no. points:", buf)) {
-            s = buf;
-            SKIP(s);
-            SKIP(s);
+            s = SKIP(buf);
+            s = SKIP(s);
             npoints = scannum(s);
         } else if (ciprefix("dimensions:", buf)) {
             if (npoints == 0) {
@@ -392,8 +422,7 @@ raw_read(char *name) {
                         "Error: misplaced Dimensions: line\n");
                 continue;
             }
-            s = buf;
-            SKIP(s);
+            s = SKIP(buf);
             if (atodims(s, dims, &numdims)) { /* Something's wrong. */
                 fprintf(cp_err,
                         "Warning: syntax error in dimensions, ignored.\n");
@@ -417,8 +446,7 @@ raw_read(char *name) {
             }
         } else if (ciprefix("command:", buf)) {
             /* Note that we reverse these commands eventually... */
-            s = buf;
-            SKIP(s);
+            s = SKIP(buf);
             NONL(s);
             if (curpl) {
                 curpl->pl_commands = wl_cons(copy(s), curpl->pl_commands);
@@ -429,8 +457,7 @@ raw_read(char *name) {
             /* Now execute the command if we can. */
             (void) cp_evloop(s);
         } else if (ciprefix("option:", buf)) {
-            s = buf;
-            SKIP(s);
+            s = SKIP(buf);
             NONL(s);
             if (curpl) {
                 wl = cp_lexer(s);
@@ -451,10 +478,13 @@ raw_read(char *name) {
                 plots = NULL;
                 break;
             }
-            s = buf;
-            SKIP(s);
+            s = SKIP(buf);
             if (!*s) {
-                (void) fgets(buf, BSIZE_SP, fp);
+                if (fgets(buf, BSIZE_SP, fp) == (char *) NULL) {
+                    fprintf(cp_err, "Error: unable to read line\n");
+                    plots = NULL;
+                    break;
+                }
                 s = buf;
             }
             if (numdims == 0) {
@@ -463,31 +493,36 @@ raw_read(char *name) {
             }
             /* Now read all the variable lines in. */
             for (i = 0; i < nvars; i++) {
-                v = alloc(struct dvec);
-                ZERO(v, struct dvec);
-                v->v_next = curpl->pl_dvecs;
-                curpl->pl_dvecs = v;
+                /* Allocate the data array. We would use
+                 * the desired vector length, but this would
+                 * be dangerous if the file is invalid.
+                 */
+                v = dvec_alloc(NULL,
+                               SV_NOTYPE, (short) flags,
+                               npoints, NULL);
+                /* Length and dims might be changed by options. */
+
+                v->v_plot = curpl;
+
                 if (!curpl->pl_scale)
                     curpl->pl_scale = v;
-                v->v_flags = (short)flags;
-                v->v_plot = curpl;
-                v->v_length = npoints;
-                v->v_numdims = 0;
-                /* Length and dims might be changed by options. */
 
                 if (!i) {
                     curpl->pl_scale = v;
                 } else {
-                    (void) fgets(buf, BSIZE_SP, fp);
+                    if (fgets(buf, BSIZE_SP, fp) == (char *) NULL) {
+                        fprintf(cp_err, "Error: unable to read variable line\n");
+                        break;
+                    }
                     s = buf;
                 }
-                (void) gettok(&s);  /* The strchr field. */
+                s = nexttok(s);  /* The strchr field. */
                 if ((t = gettok(&s)) != NULL) {
                     v->v_name = t;
                 } else {
                     fprintf(cp_err, "Error: bad var line %s\n", buf);
                     /* MW. v_name must be valid in the case that no. points = 0 */
-                    v->v_name = "no vars\n";
+                    v->v_name = copy("no vars\n");
                 }
                 t = gettok(&s); /* The type name. */
                 if (t)
@@ -496,9 +531,10 @@ raw_read(char *name) {
                     fprintf(cp_err, "Error: bad var line %s\n", buf);
 
                 /* Fix the name... */
-                if (isdigit(*v->v_name) && (r = ft_typabbrev(v ->v_type)) != NULL) {
-                    (void) sprintf(buf2, "%s(%s)", r, v->v_name);
-                    v->v_name = copy(buf2);
+                if (isdigit_c(v->v_name[0]) && (r = ft_typabbrev(v ->v_type)) != NULL) {
+                    char *x = v->v_name;
+                    v->v_name = tprintf("%s(%s)", r, v->v_name);
+                    tfree(x);
                 }
 
                 /* Now come the strange options... */
@@ -532,14 +568,9 @@ raw_read(char *name) {
                     for (j = 0; j < numdims; j++)
                         v->v_dims[j] = dims[j];
                 }
-                /* And allocate the data array. We would use
-                 * the desired vector length, but this would
-                 * be dangerous if the file is invalid.
-                 */
-                if (isreal(v))
-                    v->v_realdata = TMALLOC(double, npoints);
-                else
-                    v->v_compdata = TMALLOC(ngcomplex_t, npoints);
+
+                v->v_next = curpl->pl_dvecs;
+                curpl->pl_dvecs = v;
             }
 
         } else if (ciprefix("values:", buf) || ciprefix("binary:", buf)) {
@@ -583,7 +614,10 @@ raw_read(char *name) {
             for (i = 0; i < npoints; i++) {
                 if (is_ascii) {
                     /* It's an ASCII file. */
-                    (void) fscanf(fp, " %d", &j);
+                    if (fscanf(fp, " %d", &j) != 1) {
+                        fprintf(cp_err, "Error: unable to read point count\n");
+                        break;
+                    }
                     for (v = curpl->pl_dvecs; v; v = v->v_next) {
                         if (i < v->v_length) {
                             if (flags & VF_REAL) {
@@ -641,7 +675,7 @@ raw_read(char *name) {
         } else {
             s = buf;
             if (is_ascii) {
-                SKIP(s);
+                s = SKIP(s);
             }
             if (*s) {
                 fprintf(cp_err,
@@ -649,7 +683,7 @@ raw_read(char *name) {
                 return (NULL);
             }
         }
-    }
+    } /* end of loop */
 
     if (curpl) {    /* reverse commands list */
         for (wl = curpl->pl_commands, curpl->pl_commands = NULL;
@@ -695,10 +729,10 @@ fixdims(struct dvec *v, char *s)
     for (i = 0, ndimpoints = 1; i < v->v_numdims; i++)
         ndimpoints *= v->v_dims[i];
 
-    if (ndimpoints > v->v_length)
-        v->v_numdims = 0;
+    if (v->v_length >= ndimpoints)
+        dvec_trunc(v, ndimpoints);
     else
-        v->v_length = ndimpoints;
+        v->v_numdims = 0;
 }
 
 

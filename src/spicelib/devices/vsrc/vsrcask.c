@@ -92,7 +92,10 @@ VSRCask(CKTcircuit *ckt, GENinstance *inst, int which, IFvalue *value, IFvalue *
                 strcpy(errMsg,msg);
                 return(E_ASKCURRENT);
             } else {
-                value->rValue = *(ckt->CKTrhsOld+here->VSRCbranch);
+                if (ckt->CKTrhsOld)
+                    value->rValue = *(ckt->CKTrhsOld + here->VSRCbranch);
+                else
+                    value->rValue = 0.;
             }
             return(OK);
         case VSRC_POWER:
@@ -104,9 +107,14 @@ VSRCask(CKTcircuit *ckt, GENinstance *inst, int which, IFvalue *value, IFvalue *
             } else {
                 value->rValue = (*(ckt->CKTrhsOld+here->VSRCposNode)
                         - *(ckt->CKTrhsOld + here->VSRCnegNode)) *
-                        -*(ckt->CKTrhsOld + here->VSRCbranch);
+                         *(ckt->CKTrhsOld + here->VSRCbranch);
             }
             return(OK);
+#ifdef SHARED_MODULE
+        case VSRC_EXTERNAL:
+            /* Don't do anything */
+            return (OK);
+#endif
         default:
             return (E_BADPARM);
     }

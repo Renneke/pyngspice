@@ -33,7 +33,7 @@ MOS6temp(GENmodel *inModel, CKTcircuit *ckt)
     double fermis;
     double vfb;
     /* loop through all the resistor models */
-    for( ; model != NULL; model = model->MOS6nextModel) {
+    for( ; model != NULL; model = MOS6nextModel(model)) {
         
 
         /* perform model defaulting */
@@ -52,8 +52,8 @@ MOS6temp(GENmodel *inModel, CKTcircuit *ckt)
     /* now model parameter preprocessing */
 
         if (model->MOS6phi <= 0.0) {
-            SPfrontEnd->IFerror (ERR_FATAL,
-               "%s: Phi is not positive.", &model->MOS6modName);
+            SPfrontEnd->IFerrorf (ERR_FATAL,
+               "%s: Phi is not positive.", model->MOS6modName);
             return(E_BADPARM);
         }
 
@@ -107,8 +107,8 @@ MOS6temp(GENmodel *inModel, CKTcircuit *ckt)
                     }
                 } else {
                     model->MOS6substrateDoping = 0;
-                    SPfrontEnd->IFerror (ERR_FATAL,
-                            "%s: Nsub < Ni",&model->MOS6modName);
+                    SPfrontEnd->IFerrorf (ERR_FATAL,
+                            "%s: Nsub < Ni", model->MOS6modName);
                     return(E_BADPARM);
                 }
             }
@@ -116,8 +116,8 @@ MOS6temp(GENmodel *inModel, CKTcircuit *ckt)
 
         
         /* loop through all instances of the model */
-        for(here = model->MOS6instances; here!= NULL; 
-                here = here->MOS6nextInstance) {
+        for(here = MOS6instances(model); here!= NULL; 
+                here = MOS6nextInstance(here)) {
 
             double czbd;    /* zero voltage bulk-drain capacitance */
             double czbdsw;  /* zero voltage bulk-drain sidewall capacitance */
@@ -157,9 +157,9 @@ MOS6temp(GENmodel *inModel, CKTcircuit *ckt)
             }
 
             if(here->MOS6l - 2 * model->MOS6latDiff <=0) {
-                SPfrontEnd->IFerror (ERR_WARNING,
+                SPfrontEnd->IFerrorf (ERR_WARNING,
                         "%s: effective channel length less than zero",
-                        &(model->MOS6modName));
+                        model->MOS6modName);
             }
             ratio4 = ratio * sqrt(ratio);
             here->MOS6tKv = model->MOS6kv;

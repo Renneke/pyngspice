@@ -4,10 +4,12 @@ Author: 1985 Wayne A. Christopher, U. C. Berkeley CAD Group
 ***********/
 
 #include "ngspice/ngspice.h"
+#include "ngspice/const.h"
 #include "ngspice/cpdefs.h"
 #include "ngspice/ftedefs.h"
 #include "ngspice/dvec.h"
 #include "ngspice/fteparse.h"
+#include "ngspice/stringskip.h"
 #include "cpitf.h"
 #include "com_let.h"
 #include "com_set.h"
@@ -22,6 +24,11 @@ Author: 1985 Wayne A. Christopher, U. C. Berkeley CAD Group
 /* Set some standard variables and aliases, etc, and init the ccom stuff.
    Called by fcn main() */
 
+/* Macros to expand a macro to its value and then quote that value */
+#undef stringit
+#undef stringit2
+#define stringit2(x) #x
+#define stringit(x) stringit2(x)
 void
 ft_cpinit(void)
 {
@@ -36,14 +43,14 @@ ft_cpinit(void)
         "TRUE",     "1",
         "no",       "0",
         "FALSE",    "0",
-        "pi",       "3.14159265358979323846",
-        "e",        "2.71828182844590452353",
-        "c",        "2.997925e8",
+        "pi",       stringit(CONSTpi),
+        "e",        stringit(CONSTnap),
+        "c",        stringit(CONSTc),
         "i",        "0,1",
-        "kelvin",   "-273.15",
-        "echarge",  "1.60219e-19",
-        "boltz",    "1.38062e-23",
-        "planck",   "6.62620e-34"
+        "kelvin",   stringit(CONSTKtoC_for_str),
+        "echarge",  stringit(CHARGE),
+        "boltz",    stringit(CONSTboltz),
+        "planck",   stringit(CONSTplanck)
     };
 
     static char *udfs[] = {
@@ -62,13 +69,13 @@ ft_cpinit(void)
         "vr(x)",    "re(v(x))",
         "vr(x,y)",  "re(v(x) - v(y))"
     };
-
+#ifndef SHARED_MODULE
     /* if TIOCSTI is defined (not available in MS Windows:
        Make escape the break character.
        So the user can type ahead...
        fcn defined in complete.c. */
     cp_ccon(TRUE);
-
+#endif
     /* Initialize io, cp_chars[], variable "history" in init.c. */
     cp_init();
 
@@ -219,8 +226,27 @@ ft_cpinit(void)
         }
     }
 
-    /* Reset this for the front end. */
-    cp_hash = '*';
+    /* set variables to read program configuration into special spinit for VS */
+#ifdef _MSC_VER
+#ifdef CONFIG64
+#ifdef NGDEBUG
+    cp_vset("pg_config", CP_STRING, "d64");
+#else
+    cp_vset("pg_config", CP_STRING, "r64");
+#endif
+#else
+#ifdef NGDEBUG
+    cp_vset("pg_config", CP_STRING, "d32");
+#else
+    cp_vset("pg_config", CP_STRING, "r32");
+#endif
+#endif
+#endif
+
+/* set a variable to announce windows console (to be used in unselecting plotting) */
+#if (defined(_MSC_VER) || defined(__MINGW32__)) && !defined(HAS_WINGUI)
+    cp_vset("win_console", CP_BOOL, &t);
+#endif
 
     /* NGSPICEDATADIR has been set to path "$dprefix/share/ngspice" in configure.ac,
        Spice_Lib_Dir has been set to NGSPICEDATADIR in conf.c,
@@ -236,7 +262,6 @@ ft_cpinit(void)
         {
             wordlist *wl;
             wl = cp_doglob(cp_lexer(buf));
-            cp_striplist(wl);
             com_set(wl);
             wl_free(wl);
         }
@@ -245,11 +270,16 @@ ft_cpinit(void)
 
         /* jump over leading spaces */
         for (copys = s = cp_tildexpand(Lib_Path); copys && *copys; ) {
-            while (isspace(*s))
-                s++;
-            /* copy s into buf until space is seen, r is the actual position */
-            for (r = buf; *s && !isspace(*s); r++, s++)
+            s = skip_ws(s);
+            /* copy s into buf until end of s, r is the actual position in buf */
+            int ii;
+            for (r = buf, ii = 0; *s; r++, s++, ii++) {
                 *r = *s;
+                if (ii > 500) {
+                    fprintf(stderr, "Warning: spinit path is too long.\n");
+                    break;
+                }
+            }
             tfree(copys);
             /* add a path separator to buf at actual position */
             (void) strcpy(r, DIR_PATHSEP);
@@ -260,6 +290,7 @@ ft_cpinit(void)
             /* add "spinit" to buf after actual position */
             (void) strcat(r, "spinit");
 #endif
+
             if ((fp = fopen(buf, "r")) != NULL) {
 
                 cp_interactive = FALSE;
@@ -294,44 +325,45 @@ ft_cpinit(void)
 }
 
 
-/* Decide whether a condition is TRUE or not. */
+/* Decide whether a condition is TRUE or not.
+ * In erroneous situations the condition shall evaluate to FALSE
+ *   additionally error messages might have been printed.
+ */
 
 bool
 cp_istrue(wordlist *wl)
 {
-    int i;
     struct dvec *v;
     struct pnode *names;
+    bool rv;
 
     /* First do all the csh-type stuff here... */
     wl = wl_copy(wl);
     wl = cp_variablesubst(wl);
+    /* return FALSE if this did not expand to anything */
+    if (!wl)
+        return FALSE;
+    /* backquote '`' substitution */
     wl = cp_bquote(wl);
-    cp_striplist(wl);
 
+    /* parse the condition */
     names = ft_getpnames(wl, TRUE);
     wl_free(wl);
 
+    /* evaluate the parsed condition.
+     * boolean expressions evaluate to real 1.0 or 0.0 */
     v = ft_evaluate(names);
 
-    for (; v; v = v->v_link2)
-        if (isreal(v)) {
-            for (i = 0; i < v->v_length; i++)
-                if (v->v_realdata[i] != 0.0) {
-                    free_pnode(names);
-                    return (TRUE);
-                }
-        } else {
-            for (i = 0; i < v->v_length; i++)
-                if ((realpart(v->v_compdata[i]) != 0.0) ||
-                    (imagpart(v->v_compdata[i]) != 0.0)) {
-                    free_pnode(names);
-                    return (TRUE);
-                }
-        }
+    /* non boolean expressions will be considered TRUE
+     * if at least one real or complex vector element is non zero */
+    rv = !vec_iszero(v);
 
-    free_pnode(names);
-    return (FALSE);
+    /* va: garbage collection for v, if pnode names is no simple value */
+    if (names && !names->pn_value && v)
+        vec_free(v);
+    free_pnode(names); /* free also v, if pnode names is simple value */
+
+    return rv;
 }
 
 
@@ -367,23 +399,69 @@ cp_oddcomm(char *s, wordlist *wl)
     FILE *fp;
 
     if ((fp = inp_pathopen(s, "r")) != NULL) {
+        /* Buffer for building string, unless unusually long */
         char buf[BSIZE_SP];
-        wordlist *setarg;
+        char *p_buf_active; /* buffer in use */
+        static const char header[] = "argc = %d argv = ( ";
+
+        /* Bound on initial length: Header - 2 for %d - 1 for null +
+         * + 2 for closing ')' and '\0'  + bound on length of int
+         * as string */
+        size_t n_byte_data =
+                sizeof header / sizeof *header + 3 * sizeof(int) - 1;
+
         (void) fclose(fp);
-        (void) sprintf(buf, "argc = %d argv = ( ", wl_length(wl));
-        while (wl) {
-            (void) strcat(buf, wl->wl_word);
-            (void) strcat(buf, " ");
-            wl = wl->wl_next;
+
+        /* Step through word list finding length */
+        {
+            wordlist *wl1;
+            for (wl1 = wl; wl1 != (wordlist *) NULL; wl1 = wl1->wl_next) {
+                n_byte_data += strlen(wl1->wl_word) + 1;
+            }
         }
-        (void) strcat(buf, ")");
-        setarg = cp_lexer(buf);
+
+        /* Use fixed buffer unless it is too small */
+        if (n_byte_data <= sizeof buf / sizeof *buf) {
+            p_buf_active = buf;
+        }
+        else {
+            p_buf_active = TMALLOC(char, n_byte_data);
+        }
+
+        /* Step through word list again to build string */
+        {
+            char *p_dst = p_buf_active;
+            p_dst += sprintf(p_dst, header, wl_length(wl));
+            for ( ; wl != (wordlist *) NULL; wl = wl->wl_next) {
+                const char *p_src = wl->wl_word;
+                for ( ; ; p_src++) { /* copy source string */
+                    const char ch_src = *p_src;
+                    if (ch_src == '\0') {
+                        *p_dst++ = ' ';
+                        break;
+                    }
+                    *p_dst++ = ch_src;
+                } /* end of loop copying source string */
+            } /* end of loop over words in list */
+
+            /* Add ')' and terminate string */
+            *p_dst++ = ')';
+            *p_dst = '\0';
+        } /* end of block building string */
+
+        wordlist *setarg = cp_lexer(p_buf_active);
+
+        /* Free buffer allocation if made */
+        if (p_buf_active != buf) {
+            txfree(p_buf_active);
+        }
+
         com_set(setarg);
         wl_free(setarg);
         inp_source(s);
         cp_remvar("argc");
         cp_remvar("argv");
-        return (TRUE);
+        return TRUE;
     }
 
     if (wl && eq(wl->wl_word, "=")) {
@@ -394,4 +472,7 @@ cp_oddcomm(char *s, wordlist *wl)
     }
 
     return (FALSE);
-}
+} /* end of function cp_oddcomm */
+
+
+

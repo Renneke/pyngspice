@@ -1,26 +1,64 @@
-/**** BSIM4.7.0 Released by Darsen Lu 04/08/2011 ****/
-/**** OpenMP support ngspice 06/28/2010 ****/
-/**********
- * Copyright 2006 Regents of the University of California. All rights reserved.
- * File: b4ld.c of BSIM4.7.0.
- * Author: 2000 Weidong Liu
- * Authors: 2001- Xuemei Xi, Mohan Dunga, Ali Niknejad, Chenming Hu.
- * Authors: 2006- Mohan Dunga, Ali Niknejad, Chenming Hu
- * Authors: 2007- Mohan Dunga, Wenwei Yang, Ali Niknejad, Chenming Hu
- * Authors: 2008- Wenwei Yang, Ali Niknejad, Chenming Hu 
- * Project Director: Prof. Chenming Hu.
- * Modified by Xuemei Xi, 04/06/2001.
- * Modified by Xuemei Xi, 10/05/2001.
- * Modified by Xuemei Xi, 11/15/2002.
- * Modified by Xuemei Xi, 05/09/2003.
- * Modified by Xuemei Xi, 03/04/2004.
- * Modified by Xuemei Xi, Mohan Dunga, 07/29/2005.
- * Modified by Mohan Dunga, 12/13/2006.
- * Modified by Mohan Dunga, Wenwei Yang, 05/18/2007.
- * Modified by Wenwei Yang, 07/31/2008.
- * Modified by Tanvir Morshed, Darsen Lu 03/27/2011
- **********/
+/* ******************************************************************************
+   *  BSIM4 4.8.1 released by Chetan Kumar Dabhi 2/15/2017                      *
+   *  BSIM4 Model Equations                                                     *
+   ******************************************************************************
 
+   ******************************************************************************
+   *  Copyright 2017 Regents of the University of California.                   *
+   *  All rights reserved.                                                      *
+   *                                                                            *
+   *  Project Director: Prof. Chenming Hu.                                      *
+   *  Authors: Gary W. Ng, Weidong Liu, Xuemei Xi, Mohan Dunga, Wenwei Yang     *
+   *           Ali Niknejad, Shivendra Singh Parihar, Chetan Kumar Dabhi        *
+   *           Yogesh Singh Chauhan, Sayeef Salahuddin, Chenming Hu             *
+   ******************************************************************************
+
+   ******************************************************************************
+   *                          CMC In-Code Statement                             *
+   *                                                                            *
+   *  The Developer agrees that the following statement will appear in the      *
+   *  model code that has been adopted as a CMC Standard.                       *
+   *                                                                            *
+   *  Software is distributed as is, completely without warranty or service     *
+   *  support. The University of California and its employees are not liable    *
+   *  for the condition or performance of the software.                         *
+   *                                                                            *
+   *  The University of California owns the copyright and grants users a        *
+   *  perpetual, irrevocable, worldwide, non-exclusive, royalty-free license    *
+   *  with respect to the software as set forth below.                          *
+   *                                                                            *
+   *  The University of California hereby disclaims all implied warranties.     *
+   *                                                                            *
+   *  The University of California grants the users the right to modify,        *
+   *  copy, and redistribute the software and documentation, both within        *
+   *  the user's organization and externally, subject to the following          *
+   *  restrictions:                                                             *
+   *                                                                            *
+   *  1. The users agree not to charge for the University of California code    *
+   *     itself but may charge for additions, extensions, or support.           *
+   *                                                                            *
+   *  2. In any product based on the software, the users agree to               *
+   *     acknowledge the University of California that developed the            *
+   *     software. This acknowledgment shall appear in the product              *
+   *     documentation.                                                         *
+   *                                                                            *
+   *  3. Redistributions to others of source code and documentation must        *
+   *     retain the copyright notice, disclaimer, and list of conditions.       *
+   *                                                                            *
+   *  4. Redistributions to others in binary form must reproduce the            *
+   *     copyright notice, disclaimer, and list of conditions in the            *
+   *     documentation and/or other materials provided with the                 *
+   *     distribution.                                                          *
+   *                                                                            *
+   *  Agreed to on ______Feb. 15, 2017______________                            *
+   *                                                                            *
+   *  By: ____University of California, Berkeley___                             *
+   *      ____Chenming Hu__________________________                             *
+   *      ____Professor in Graduate School ________                             *
+   *                                                                            *
+   ****************************************************************************** */
+
+/**** OpenMP support ngspice 06/28/2010 ****/
 
 #include "ngspice/ngspice.h"
 #include "ngspice/cktdefs.h"
@@ -74,25 +112,26 @@ CKTcircuit *ckt)
 #ifdef USE_OMP
     int idx;
     BSIM4model *model = (BSIM4model*)inModel;
-    int good = 0;
-    BSIM4instance *here;
+    int error = 0;
     BSIM4instance **InstArray;
     InstArray = model->BSIM4InstanceArray;
 
-#pragma omp parallel for private(here)
+#pragma omp parallel for
     for (idx = 0; idx < model->BSIM4InstCount; idx++) {
-        here = InstArray[idx];
-        good = BSIM4LoadOMP(here, ckt);
+        BSIM4instance *here = InstArray[idx];
+        int local_error = BSIM4LoadOMP(here, ckt);
+        if (local_error)
+            error = local_error;
     }
 
     BSIM4LoadRhsMat(inModel, ckt);
     
-    return good;
+    return error;
 }
 
 
 int BSIM4LoadOMP(BSIM4instance *here, CKTcircuit *ckt) {
-BSIM4model *model;
+BSIM4model *model = BSIM4modPtr(here);
 #else
 BSIM4model *model = (BSIM4model*)inModel;
 BSIM4instance *here;
@@ -240,10 +279,6 @@ int ByPass, ChargeComputationNeeded, error, Check, Check1, Check2;
 
 double m;
 
-#ifdef USE_OMP
-model = here->BSIM4modPtr;
-#endif
-
 ScalingFactor = 1.0e-9;
 ChargeComputationNeeded =  
                  ((ckt->CKTmode & (MODEDCTRANCURVE | MODEAC | MODETRAN | MODEINITSMSIG)) ||
@@ -251,9 +286,9 @@ ChargeComputationNeeded =
                  ? 1 : 0;
 
 #ifndef USE_OMP
-for (; model != NULL; model = model->BSIM4nextModel)
-{    for (here = model->BSIM4instances; here != NULL; 
-          here = here->BSIM4nextInstance)
+for (; model != NULL; model = BSIM4nextModel(model))
+{    for (here = BSIM4instances(model); here != NULL; 
+          here = BSIM4nextInstance(here))
      {
 #endif
 
@@ -1476,7 +1511,6 @@ for (; model != NULL; model = model->BSIM4nextModel)
               T1 = exp(pParam->BSIM4eu * log(T0));
               dT1_dVg = T1 * pParam->BSIM4eu / T0 / toxe;
               T2 = pParam->BSIM4ua + pParam->BSIM4uc * Vbseff;
-              T3 = T0 / toxe; /*Do we need it?*/
 
               T12 = sqrt(Vth * Vth + 0.0001);
               T9 = 1.0/(Vgsteff + 2*T12);
@@ -1491,6 +1525,60 @@ for (; model != NULL; model = model->BSIM4nextModel)
               dDenomi_dVd = T13 * dVth_dVd;
               dDenomi_dVb = T13 * dVth_dVb + T1 * pParam->BSIM4uc;
           }
+          else if (model->BSIM4mobMod == 4) /* Synopsys 08/30/2013 add */
+          {
+              T0 = Vgsteff + here->BSIM4vtfbphi1 - T14;
+              T2 = pParam->BSIM4ua + pParam->BSIM4uc * Vbseff;
+              T3 = T0 / toxe;
+              T12 = sqrt(here->BSIM4vtfbphi1*here->BSIM4vtfbphi1 + 0.0001);
+              T9 = 1.0/(Vgsteff + 2*T12);
+              T10 = T9*toxe;
+              T8 = pParam->BSIM4ud * T10 * T10 * here->BSIM4vtfbphi1;
+              T6 = T8 * here->BSIM4vtfbphi1;
+              T5 = T3 * (T2 + pParam->BSIM4ub * T3) + T6;
+              T7 = - 2.0 * T6 * T9;
+              dDenomi_dVg = (T2 + 2.0 * pParam->BSIM4ub * T3) / toxe;
+              dDenomi_dVd = 0.0;
+              dDenomi_dVb = pParam->BSIM4uc * T3;
+              dDenomi_dVg+= T7;
+          }
+          else if (model->BSIM4mobMod == 5) /* Synopsys 08/30/2013 add */
+          {
+              T0 = Vgsteff + here->BSIM4vtfbphi1 - T14;
+              T2 = 1.0 + pParam->BSIM4uc * Vbseff;
+              T3 = T0 / toxe;
+              T4 = T3 * (pParam->BSIM4ua + pParam->BSIM4ub * T3);
+              T12 = sqrt(here->BSIM4vtfbphi1 * here->BSIM4vtfbphi1 + 0.0001);
+              T9 = 1.0/(Vgsteff + 2*T12);
+              T10 = T9*toxe;
+              T8 = pParam->BSIM4ud * T10 * T10 * here->BSIM4vtfbphi1;
+              T6 = T8 * here->BSIM4vtfbphi1;
+              T5 = T4 * T2 + T6;
+              T7 = - 2.0 * T6 * T9;
+              dDenomi_dVg = (pParam->BSIM4ua + 2.0 * pParam->BSIM4ub * T3) * T2
+                          / toxe;
+              dDenomi_dVd = 0.0;
+              dDenomi_dVb = pParam->BSIM4uc * T4;
+              dDenomi_dVg+= T7;
+          }
+          else if (model->BSIM4mobMod == 6) /* Synopsys 08/30/2013 modify */
+          {   T0 = (Vgsteff + here->BSIM4vtfbphi1) / toxe;
+              T1 = exp(pParam->BSIM4eu * log(T0));
+              dT1_dVg = T1 * pParam->BSIM4eu / T0 / toxe;
+              T2 = pParam->BSIM4ua + pParam->BSIM4uc * Vbseff;
+
+              T12 = sqrt(here->BSIM4vtfbphi1 * here->BSIM4vtfbphi1 + 0.0001);
+              T9 = 1.0/(Vgsteff + 2*T12);
+              T10 = T9*toxe;
+              T8 = pParam->BSIM4ud * T10 * T10 * here->BSIM4vtfbphi1;
+              T6 = T8 * here->BSIM4vtfbphi1;
+              T5 = T1 * T2 + T6;
+              T7 = - 2.0 * T6 * T9;
+              dDenomi_dVg = T2 * dT1_dVg + T7;
+              dDenomi_dVd = 0;
+              dDenomi_dVb = T1 * pParam->BSIM4uc;
+          }
+
           /*high K mobility*/
          else 
       {                                 
@@ -1752,7 +1840,7 @@ for (; model != NULL; model = model->BSIM4nextModel)
           /* Calculate Idl first */
               
           tmp1 = here->BSIM4vtfbphi2;
-          tmp2 = 2.0e8 * model->BSIM4toxp;
+          tmp2 = 2.0e8 * here->BSIM4toxp;
           dT0_dVg = 1.0 / tmp2;
           T0 = (Vgsteff + tmp1) * dT0_dVg;
 
@@ -1762,8 +1850,8 @@ for (; model != NULL; model = model->BSIM4nextModel)
           Tcen = model->BSIM4ados * 1.9e-9 / T1;
           dTcen_dVg = -Tcen * T2 * dT0_dVg / T1;
 
-          Coxeff = epssub * model->BSIM4coxp
-                 / (epssub + model->BSIM4coxp * Tcen);
+          Coxeff = epssub * here->BSIM4coxp
+                 / (epssub + here->BSIM4coxp * Tcen);
           here->BSIM4Coxeff = Coxeff;
           dCoxeff_dVg = -Coxeff * Coxeff * dTcen_dVg / epssub;
 
@@ -2528,8 +2616,8 @@ for (; model != NULL; model = model->BSIM4nextModel)
                         dVaux_dVd = 0.0;
                           dVaux_dVb = 0.0;
                   } else if (model->BSIM4igcMod == 2) {
-                        dVaux_dVd = -dVgs_eff_dVg * dVth_dVd;
-                        dVaux_dVb = -dVgs_eff_dVg * dVth_dVb;
+                        dVaux_dVd = -dVaux_dVg* dVth_dVd;  /* Synopsys 08/30/2013 modify */
+                        dVaux_dVb = -dVaux_dVg* dVth_dVb;  /* Synopsys 08/30/2013 modify */
                   }
                   dVaux_dVg *= dVgs_eff_dVg;
               }
@@ -2590,7 +2678,7 @@ for (; model != NULL; model = model->BSIM4nextModel)
               dT7_dVd = -Vdseff * dPigcd_dVd - Pigcd * dVdseff_dVd + dT7_dVg * dVgsteff_dVd;
               dT7_dVb = -Vdseff * dPigcd_dVb - Pigcd * dVdseff_dVb + dT7_dVg * dVgsteff_dVb;
               dT7_dVg *= dVgsteff_dVg;
-              dT7_dVb *= dVbseff_dVb;
+              /*dT7_dVb *= dVbseff_dVb;*/ /* Synopsys, 2013/08/30 */
               T8 = T7 * T7 + 2.0e-4;
               dT8_dVg = 2.0 * T7;
               dT8_dVd = dT8_dVg * dT7_dVd;
@@ -3563,8 +3651,8 @@ for (; model != NULL; model = model->BSIM4nextModel)
                   dVfbeff_dVg = T1 * dVgs_eff_dVg;
                   dVfbeff_dVb = -T1 * dVbseffCV_dVb;
 
-                  Cox = model->BSIM4coxp;
-                  Tox = 1.0e8 * model->BSIM4toxp;
+                  Cox = here->BSIM4coxp;
+                  Tox = 1.0e8 * here->BSIM4toxp;
                   T0 = (Vgs_eff - VbseffCV - here->BSIM4vfbzb) / Tox;
                   dT0_dVg = dVgs_eff_dVg / Tox;
                   dT0_dVb = -dVbseffCV_dVb / Tox;
@@ -3585,7 +3673,7 @@ for (; model != NULL; model = model->BSIM4nextModel)
                       dTcen_dVg = dTcen_dVb = 0.0;
                   }
 
-                  LINK = 1.0e-3 * model->BSIM4toxp;
+                  LINK = 1.0e-3 * here->BSIM4toxp;
                   V3 = pParam->BSIM4ldeb - Tcen - LINK;
                   V4 = sqrt(V3 * V3 + 4.0 * LINK * pParam->BSIM4ldeb);
                   Tcen = pParam->BSIM4ldeb - 0.5 * (V3 + V4);
@@ -5026,7 +5114,7 @@ line900:
            here->BSIM4_25 = m * (gcrgb + gcgmbb);
 
            here->BSIM4_26 = m * gcdgmb;
-           here->BSIM4_26 = m * gcrg;
+           here->BSIM4_27 = m * gcrg;
            here->BSIM4_28 = m * gcsgmb;
            here->BSIM4_29 = m * gcbgmb;
 
@@ -5358,7 +5446,7 @@ int BSIM4polyDepletion(
 #ifdef USE_OMP
 void BSIM4LoadRhsMat(GENmodel *inModel, CKTcircuit *ckt)
 {
-    unsigned int InstCount, idx;
+    int InstCount, idx;
     BSIM4instance **InstArray;
     BSIM4instance *here;
     BSIM4model *model = (BSIM4model*)inModel;
@@ -5368,6 +5456,7 @@ void BSIM4LoadRhsMat(GENmodel *inModel, CKTcircuit *ckt)
 
     for(idx = 0; idx < InstCount; idx++) {
        here = InstArray[idx];
+       model = BSIM4modPtr(here);
         /* Update b for Ax = b */
            (*(ckt->CKTrhs + here->BSIM4dNodePrime) += here->BSIM4rhsdPrime);
            (*(ckt->CKTrhs + here->BSIM4gNodePrime) -= here->BSIM4rhsgPrime);

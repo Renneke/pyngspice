@@ -61,13 +61,7 @@ IFparm VBICpTable[] = { /* parameters */
  OPU("qbc",  VBIC_QUEST_QBC,  IF_REAL, "Charge storage B-C junction"),
  OPU("cqbc", VBIC_QUEST_CQBC, IF_REAL, "Cap. due to charge storage in B-C jct."),
  OPU("qbx",  VBIC_QUEST_QBX,  IF_REAL, "Charge storage B-X junction"),
- OPU("cqbx", VBIC_QUEST_CQBX, IF_REAL, "Cap. due to charge storage in B-X jct."),
- OPU("sens_dc",  VBIC_QUEST_SENS_DC, IF_REAL, "DC sensitivity "),
- OPU("sens_real",VBIC_QUEST_SENS_REAL, IF_REAL, "Real part of AC sensitivity"),
- OPU("sens_imag",VBIC_QUEST_SENS_IMAG,IF_REAL, "DC sens. & imag part of AC sens."),
- OPU("sens_mag", VBIC_QUEST_SENS_MAG, IF_REAL,   "Sensitivity of AC magnitude"),
- OPU("sens_ph",  VBIC_QUEST_SENS_PH,   IF_REAL,    "Sensitivity of AC phase"),
- OPU("sens_cplx",VBIC_QUEST_SENS_CPLX, IF_COMPLEX, "AC sensitivity")
+ OPU("cqbx", VBIC_QUEST_CQBX, IF_REAL, "Cap. due to charge storage in B-X jct.")
 };
 
 IFparm VBICmPTable[] = { /* model parameters */
@@ -75,6 +69,7 @@ IFparm VBICmPTable[] = { /* model parameters */
  IOPU("npn",  VBIC_MOD_NPN,   IF_FLAG, "NPN type device"),
  IOPU("pnp",  VBIC_MOD_PNP,   IF_FLAG, "PNP type device"),
  IOP("tnom",  VBIC_MOD_TNOM,  IF_REAL, "Parameter measurement temperature"),
+ IOPR("tref",  VBIC_MOD_TNOM,  IF_REAL, "Parameter measurement temperature"),
  IOP("rcx",   VBIC_MOD_RCX,   IF_REAL, "Extrinsic coll resistance"),
  IOP("rci",   VBIC_MOD_RCI,   IF_REAL, "Intrinsic coll resistance"),
  IOP("vo",    VBIC_MOD_VO,    IF_REAL, "Epi drift saturation voltage"),
@@ -193,7 +188,8 @@ char *VBICnames[] = {
     "collector",
     "base",
     "emitter",
-    "substrate"
+    "substrate",
+    "temp"
 };
 
 

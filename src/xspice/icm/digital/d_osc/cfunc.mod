@@ -3,10 +3,10 @@
 
 FILE d_osc/cfunc.mod
 
-Copyright 1991
-Georgia Tech Research Corporation, Atlanta, Ga. 30332
-All Rights Reserved
+Public Domain
 
+Georgia Tech Research Corporation
+Atlanta, Georgia 30332
 PROJECT A-8503-405
                
 
@@ -180,8 +180,7 @@ void cm_d_osc(ARGS)
 
     int               i,    /* generic loop counter index */
               cntl_size,    /* control array size         */
-              freq_size,    /* frequency array size       */
-              int_cycle;    /* integer number of cycles   */ 
+              freq_size;    /* frequency array size       */
          
                         
 
@@ -287,6 +286,7 @@ void cm_d_osc(ARGS)
             y = (double *) calloc((size_t) freq_size, sizeof(double));
             if (!y) {
                 cm_message_send(d_osc_allocation_error);  
+                if(x) free(x);
                 return;
             }
         
@@ -343,12 +343,9 @@ void cm_d_osc(ARGS)
             /* calculate the instantaneous phase */
             *phase = *phase_old + freq * (TIME - T(1));
         
-            /* convert the phase to an integer */
-            int_cycle = *phase_old;
-        		
             /* dphase is the percent into the cycle for
                the period */	
-            dphase = *phase_old - int_cycle;
+            dphase = *phase_old - floor(*phase_old);
 
 
             /* Calculate the time variables and the output value

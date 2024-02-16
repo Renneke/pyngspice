@@ -30,7 +30,7 @@ com_inventory(wordlist *wl)
 
     NG_IGNORE(wl);
 
-    if (!ft_curckt) {
+    if (!ft_curckt || !ft_curckt->ci_ckt) {
         fprintf(cp_err, "There is no current circuit\n");
         return;
     }
@@ -40,9 +40,9 @@ com_inventory(wordlist *wl)
     devList = stat->STATdevNum;
 
     out_init();
-    out_send("Circuit Inventory\n\n");
+    out_send("\nCircuit Inventory\n\n");
     for (k = 0; k < ft_sim->numDevices; k++)
-        if (ft_sim->devices[k])
+        if (ft_sim->devices[k] && devList[k].instNum > 0)
             out_printf("%s: %d\n",
                        ft_sim->devices[k]->name,
                        devList[k].instNum);

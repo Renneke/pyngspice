@@ -24,6 +24,7 @@ extern struct dbcomm *dbs;
 #include "ngspice/miftypes.h"
 
 #include "ngspice/evt.h"
+#include "ngspice/enh.h"
 #include "ngspice/mif.h"
 #include "ngspice/evtproto.h"
 #include "ngspice/ipctiein.h"
@@ -38,7 +39,6 @@ extern struct dbcomm *dbs;
 extern int add_bkpt(void);
 extern int sharedsync(double*, double*, double, double, double, int, int*, int);
 extern int ng_ident;      /* for debugging */
-static double del_before; /* for debugging */
 #endif
 
 #define INIT_STATS() \
@@ -128,7 +128,7 @@ DCtran(CKTcircuit *ckt,
         ckt->CKTtimeListSize = (int) ceil( ckt->CKTfinalTime / maxstepsize );
         ltra_num = CKTtypelook("LTRA");
         if (ltra_num >= 0 && ckt->CKThead[ltra_num] != NULL)
-            ckt->CKTtimePoints = NEWN(double, ckt->CKTtimeListSize);
+            ckt->CKTtimePoints = TMALLOC(double, ckt->CKTtimeListSize);
         /* end LTRA code addition */
 
         if(ckt->CKTbreaks) FREE(ckt->CKTbreaks);
@@ -229,37 +229,10 @@ DCtran(CKTcircuit *ckt,
         if(converged != 0) {
             fprintf(stdout,"\nTransient solution failed -\n");
             CKTncDump(ckt);
-/*          CKTnode *node;
-            double new, old, tol;
-            int i=1;
-
-            fprintf(stdout,"\nTransient solution failed -\n\n");
-            fprintf(stdout,"Last Node Voltages\n");
-            fprintf(stdout,"------------------\n\n");
-            fprintf(stdout,"%-30s %20s %20s\n", "Node", "Last Voltage",
-                                                               "Previous Iter");
-            fprintf(stdout,"%-30s %20s %20s\n", "----", "------------",
-                                                               "-------------");
-            for(node=ckt->CKTnodes->next;node;node=node->next) {
-                if (strstr(node->name, "#branch") || !strstr(node->name, "#")) {
-                    new =  ckt->CKTrhsOld [i] ;
-                    old =  ckt->CKTrhs [i] ;
-                    fprintf(stdout,"%-30s %20g %20g", node->name, new, old);
-                    if(node->type == SP_VOLTAGE) {
-                        tol =  ckt->CKTreltol * (MAX(fabs(old),fabs(new))) +
-                                ckt->CKTvoltTol;
-                    } else {
-                        tol =  ckt->CKTreltol * (MAX(fabs(old),fabs(new))) +
-                                ckt->CKTabstol;
-                    }
-                    if (fabs(new-old) >tol ) {
-                        fprintf(stdout," *");
-                    }
-                    fprintf(stdout,"\n");
-                }
-                i++;
-            } */
             fprintf(stdout,"\n");
+            fflush(stdout);
+        } else if (ckt->CKTmode & MODEUIC) {
+            fprintf(stdout,"Using transient initial conditions\n");
             fflush(stdout);
         } else if (!ft_noacctprint && !ft_noinitprint) {
             fprintf(stdout,"\nInitial Transient Solution\n");
@@ -267,7 +240,7 @@ DCtran(CKTcircuit *ckt,
             fprintf(stdout,"%-30s %15s\n", "Node", "Voltage");
             fprintf(stdout,"%-30s %15s\n", "----", "-------");
             for(node=ckt->CKTnodes->next;node;node=node->next) {
-                if (strstr(node->name, "#branch") || !strstr(node->name, "#"))
+                if (strstr(node->name, "#branch") || !strchr(node->name, '#'))
                     fprintf(stdout,"%-30s %15g\n", node->name,
                                               ckt->CKTrhsOld[node->number]);
             }
@@ -275,7 +248,10 @@ DCtran(CKTcircuit *ckt,
             fflush(stdout);
         }
 
-        if(converged != 0) return(converged);
+        if (converged != 0) {
+            SPfrontEnd->OUTendPlot(job->TRANplot);
+            return(converged);
+        }
 #ifdef XSPICE
 /* gtri - add - wbk - 12/19/90 - Add IPC stuff */
 
@@ -340,7 +316,7 @@ DCtran(CKTcircuit *ckt,
         ckt->CKTmode = (ckt->CKTmode&MODEUIC) | MODETRAN | MODEINITTRAN;
         /* modeinittran set here */
         ckt->CKTag[0]=ckt->CKTag[1]=0;
-        bcopy(ckt->CKTstate0, ckt->CKTstate1,
+        memcpy(ckt->CKTstate1, ckt->CKTstate0,
               (size_t) ckt->CKTnumStates * sizeof(double));
 
 #ifdef WANT_SENSE2
@@ -429,7 +405,7 @@ DCtran(CKTcircuit *ckt,
 #ifdef XSPICE
 /* gtri - modify - wbk - 12/19/90 - Send IPC stuff */
 
-    if(g_ipc.enabled) {
+    if ((g_ipc.enabled) || wantevtdata) {
 
         /* Send event-driven results */
         EVTdump(ckt, IPC_ANAL_TRAN, 0.0);
@@ -455,9 +431,13 @@ DCtran(CKTcircuit *ckt,
         if( (ckt->CKTtime >= (g_ipc.mintime + g_ipc.last_time)) ||
             ipc_firsttime || ipc_secondtime || ipc_delta_cut ) {
 
-            ipc_send_data_prefix(ckt->CKTtime);
-            CKTdump(ckt, ckt->CKTtime, job->TRANplot);
-            ipc_send_data_suffix();
+            if (wantevtdata)
+                CKTdump(ckt, ckt->CKTtime, job->TRANplot);
+            else {
+                ipc_send_data_prefix(ckt->CKTtime);
+                CKTdump(ckt, ckt->CKTtime, job->TRANplot);
+                ipc_send_data_suffix();
+            }
 
             if(ipc_firsttime) {
                 ipc_firsttime = IPC_FALSE;
@@ -474,7 +454,8 @@ DCtran(CKTcircuit *ckt,
 #ifdef CLUSTER
         CLUoutput(ckt);
 #endif
-        if(ckt->CKTtime >= ckt->CKTinitTime)
+        if((ckt->CKTmode&MODEUIC && ckt->CKTtime > 0 && ckt->CKTtime >= ckt->CKTinitTime) 
+                || (!(ckt->CKTmode&MODEUIC) && ckt->CKTtime >= ckt->CKTinitTime))
             CKTdump(ckt, ckt->CKTtime, job->TRANplot);
 #ifdef XSPICE
 /* gtri - begin - wbk - Update event queues/data for accepted timepoint */
@@ -780,10 +761,10 @@ resume:
         ckt->CKTstat->STATtimePts ++;
         ckt->CKTmode = (ckt->CKTmode&MODEUIC)|MODETRAN | MODEINITPRED;
         if(firsttime) {
-            for(i=0;i<ckt->CKTnumStates;i++) {
-                ckt->CKTstate2[i] = ckt->CKTstate1[i];
-                ckt->CKTstate3[i] = ckt->CKTstate1[i];
-            }
+            memcpy(ckt->CKTstate2, ckt->CKTstate1,
+                   (size_t) ckt->CKTnumStates * sizeof(double));
+            memcpy(ckt->CKTstate3, ckt->CKTstate1,
+                   (size_t) ckt->CKTnumStates * sizeof(double));
         }
         /* txl, cpl addition */
         if (converged == 1111) {
@@ -801,7 +782,7 @@ resume:
 #endif
             ckt->CKTdelta = ckt->CKTdelta/8;
 #ifdef STEPDEBUG
-            (void)printf("delta cut to %g for non-convergance\n",ckt->CKTdelta);
+            (void)printf("delta cut to %g for non-convergence\n",ckt->CKTdelta);
             fflush(stdout);
 #endif
             if(firsttime) {
@@ -859,30 +840,32 @@ resume:
                 UPDATE_STATS(DOING_TRAN);
                 return(error);
             }
-            if(newdelta > .9 * ckt->CKTdelta) {
-                if((ckt->CKTorder == 1) && (ckt->CKTmaxOrder > 1)) { /* don't rise the order for backward Euler */
+            if (newdelta > .9 * ckt->CKTdelta) {
+                if ((ckt->CKTorder == 1) && (ckt->CKTmaxOrder > 1)) { /* don't rise the order for backward Euler */
                     newdelta = ckt->CKTdelta;
                     ckt->CKTorder = 2;
-                    error = CKTtrunc(ckt,&newdelta);
-                    if(error) {
+                    error = CKTtrunc(ckt, &newdelta);
+                    if (error) {
                         UPDATE_STATS(DOING_TRAN);
                         return(error);
                     }
-                    if(newdelta <= 1.05 * ckt->CKTdelta) {
+                    if (newdelta <= 1.05 * ckt->CKTdelta) {
                         ckt->CKTorder = 1;
                     }
                 }
                 /* time point OK  - 630 */
                 ckt->CKTdelta = newdelta;
 #ifdef NDEV
-                /* show a time process indicator, by Gong Ding, gdiso@ustc.edu */
-                if(ckt->CKTtime/ckt->CKTfinalTime*100<10.0)
-                    printf("%%%3.2lf\b\b\b\b\b",ckt->CKTtime/ckt->CKTfinalTime*100);
-                else  if(ckt->CKTtime/ckt->CKTfinalTime*100<100.0)
-                    printf("%%%4.2lf\b\b\b\b\b\b",ckt->CKTtime/ckt->CKTfinalTime*100);
-                else
-                    printf("%%%5.2lf\b\b\b\b\b\b\b",ckt->CKTtime/ckt->CKTfinalTime*100);
-                fflush(stdout);
+                if (!ft_norefprint) {
+                    /* show a time process indicator, by Gong Ding, gdiso@ustc.edu */
+                    if (ckt->CKTtime / ckt->CKTfinalTime * 100 < 10.0)
+                        printf("%%%3.2lf\b\b\b\b\b", ckt->CKTtime / ckt->CKTfinalTime * 100);
+                    else  if (ckt->CKTtime / ckt->CKTfinalTime * 100 < 100.0)
+                        printf("%%%4.2lf\b\b\b\b\b\b", ckt->CKTtime / ckt->CKTfinalTime * 100);
+                    else
+                        printf("%%%5.2lf\b\b\b\b\b\b\b", ckt->CKTtime / ckt->CKTfinalTime * 100);
+                    fflush(stdout);
+                }
 #endif
 
 #ifdef STEPDEBUG

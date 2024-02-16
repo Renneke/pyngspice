@@ -49,9 +49,9 @@ TFanal(CKTcircuit *ckt, int restart)
     ptr = CKTfndDev(ckt, job->TFinSrc);
 
     if (!ptr || ptr->GENmodPtr->GENmodType < 0) {
-        SPfrontEnd->IFerror (ERR_WARNING,
+        SPfrontEnd->IFerrorf (ERR_WARNING,
                              "Transfer function source %s not in circuit",
-                             &job->TFinSrc);
+                             job->TFinSrc);
         job->TFinIsV = 0;
         job->TFinIsI = 0;
         return E_NOTFOUND;
@@ -64,9 +64,9 @@ TFanal(CKTcircuit *ckt, int restart)
         job->TFinIsV = 0;
         job->TFinIsI = 1;
     } else {
-        SPfrontEnd->IFerror (ERR_WARNING,
+        SPfrontEnd->IFerrorf (ERR_WARNING,
                              "Transfer function source %s not of proper type",
-                             &job->TFinSrc);
+                             job->TFinSrc);
         return E_NOTFOUND;
     }
 
@@ -76,8 +76,8 @@ TFanal(CKTcircuit *ckt, int restart)
     }
 
     if (job->TFinIsI) {
-        ckt->CKTrhs[ptr->GENnode1] -= 1;
-        ckt->CKTrhs[ptr->GENnode2] += 1;
+        ckt->CKTrhs[GENnode(ptr)[0]] -= 1;
+        ckt->CKTrhs[GENnode(ptr)[1]] += 1;
     } else {
         insrc = CKTfndBranch(ckt, job->TFinSrc);
         ckt->CKTrhs[insrc] += 1;
@@ -97,9 +97,7 @@ TFanal(CKTcircuit *ckt, int restart)
     if (job->TFoutIsI) {
         SPfrontEnd->IFnewUid (ckt, &outuid, job->TFoutSrc ,"Output_impedance", UID_OTHER, NULL);
     } else {
-        name = TMALLOC(char, strlen(job->TFoutName) + 22);
-        (void)sprintf(name,"output_impedance_at_%s",
-                job->TFoutName);
+        name = tprintf("output_impedance_at_%s", job->TFoutName);
         SPfrontEnd->IFnewUid (ckt, &outuid, NULL, name, UID_OTHER, NULL);
     }
 
@@ -121,8 +119,8 @@ TFanal(CKTcircuit *ckt, int restart)
 
     /* now for input resistance */
     if (job->TFinIsI) {
-        outputs[1] = ckt->CKTrhs[ptr->GENnode2] -
-                ckt->CKTrhs[ptr->GENnode1];
+        outputs[1] = ckt->CKTrhs[GENnode(ptr)[1]] -
+            ckt->CKTrhs[GENnode(ptr)[0]];
     } else {
         if(fabs(ckt->CKTrhs[insrc])<1e-20) {
             outputs[1]=1e20;

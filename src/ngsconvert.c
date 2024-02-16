@@ -24,13 +24,13 @@ FILE *cp_err = NULL;
 FILE *cp_curin = NULL;
 FILE *cp_curout = NULL;
 FILE *cp_curerr = NULL;
-int cp_maxhistlength;
 bool cp_debug = FALSE;
 char cp_chars[128];
 bool cp_nocc = TRUE;
 bool ft_stricterror = FALSE;
 bool ft_parsedb = FALSE;
 struct circ *ft_curckt = NULL;
+struct plot *plot_cur = NULL;
 
 char *cp_program = "sconvert";
 
@@ -95,7 +95,7 @@ oldread(char *name)
         perror(name);
         return (NULL);
     }
-    pl = alloc(struct plot);
+    pl = TMALLOC(struct plot, 1);
     tfread(buf, 1, 80, fp);
     buf[80] = '\0';
     for (i = (int) strlen(buf) - 1; (i > 1) && (buf[i] == ' '); i--)
@@ -114,7 +114,9 @@ oldread(char *name)
         fprintf(cp_err, "Warning: magic number 4 is wrong...\n");
 
     for (i = 0; i < nv; i++) {
-        v = alloc(struct dvec);
+        v = dvec_alloc(NULL,
+                       SV_NOTYPE, 0,
+                       0, NULL);
         if (end)
             end->v_next = v;
         else
@@ -172,12 +174,7 @@ oldread(char *name)
     np = i / nv;
 
     for (v = pl->pl_dvecs; v; v = v->v_next) {
-        v->v_length = (int) np;
-        if (isreal(v)) {
-            v->v_realdata = TMALLOC(double, np);
-        } else {
-            v->v_compdata = TMALLOC(ngcomplex_t, np);
-        }
+        dvec_realloc(v, (int) np, NULL);
     }
     for (i = 0; i < np; i++) {
         /* Read in the output vector for point i. If the type is
@@ -432,13 +429,13 @@ void cp_pushcontrol(void) { }
 void cp_popcontrol(void) { }
 void out_init(void) { }
 void cp_doquit(void) { exit(0); }
-void cp_usrvars(struct variable **v1, struct variable **v2) { *v1 = NULL; *v2 = NULL;  return; }
+struct variable *cp_usrvars(void) { return NULL; }
 int cp_evloop(char *s) { NG_IGNORE(s); return (0); }
 void cp_ccon(bool o) { NG_IGNORE(o); }
-char*if_errstring(int c) { NG_IGNORE(c); return ("error"); }
+char*if_errstring(int c) { NG_IGNORE(c); return copy("error"); }
 void out_printf(char *fmt, ...) { NG_IGNORE(fmt); }
 void out_send(char *string) { NG_IGNORE(string); }
-struct variable * cp_enqvar(char *word) { NG_IGNORE(word); return (NULL); }
+struct variable * cp_enqvar(const char *word, int *tbfreed) { NG_IGNORE(word); NG_IGNORE(*tbfreed); return (NULL); }
 struct dvec *vec_get(const char *word) { NG_IGNORE(word); return (NULL); }
 void cp_ccom(wordlist *w, char *b, bool e) {
   NG_IGNORE(e);
@@ -447,6 +444,7 @@ void cp_ccom(wordlist *w, char *b, bool e) {
 int cp_usrset(struct variable *v, bool i) {
     NG_IGNORE(i);
     NG_IGNORE(v); return(US_OK); }
+wordlist * cp_doalias(wordlist *wlist) {NG_IGNORE(wlist); return NULL;}
 
 int disptype;
 

@@ -4,11 +4,11 @@
  Copyright (C) 2012 Hiroshima University & STARC
 
  MODEL NAME : HiSIM_HV 
- ( VERSION : 1  SUBVERSION : 2  REVISION : 3 )
+ ( VERSION : 1  SUBVERSION : 2  REVISION : 4 )
  Model Parameter VERSION : 1.23
  FILE : hsmhvnoi.c
 
- DATE : 2012.4.6
+ DATE : 2013.04.30
 
  released by 
                 Hiroshima University &
@@ -43,7 +43,6 @@ int HSMHVnoise (
 {
   register HSMHVmodel *model = (HSMHVmodel *)inModel;
   register HSMHVinstance *here;
-  char name[N_MXVLNTH];
   double tempOnoise=0.0 ;
   double tempInoise=0.0 ;
   double noizDens[HSMHVNSRCS] ;
@@ -65,9 +64,9 @@ int HSMHVnoise (
     ""                  /* total transistor noise */
   };
   
-  for ( ;model != NULL; model = model->HSMHVnextModel ) {
-    for ( here = model->HSMHVinstances; here != NULL;
-	  here = here->HSMHVnextInstance ) {
+  for ( ;model != NULL; model = HSMHVnextModel(model)) {
+    for ( here = HSMHVinstances(model); here != NULL;
+	  here = HSMHVnextInstance(here)) {
       switch (operation) {
       case N_OPEN:
 	/* see if we have to to produce a summary report */
@@ -77,35 +76,13 @@ int HSMHVnoise (
 	  switch (mode) {
 	  case N_DENS:
 	    for ( i = 0; i < HSMHVNSRCS; i++ ) { 
-	      (void) sprintf(name, "onoise.%s%s", 
-			     here->HSMHVname, HSMHVnNames[i]);
-	      data->namelist = TREALLOC(IFuid, data->namelist, data->numPlots + 1);
-	      if (!data->namelist)
-		return(E_NOMEM);
-	      (*(SPfrontEnd->IFnewUid)) 
-		(ckt, &(data->namelist[data->numPlots++]),
-		 (IFuid) NULL, name, UID_OTHER, NULL);
+	      NOISE_ADD_OUTVAR(ckt, data, "onoise.%s%s", here->HSMHVname, HSMHVnNames[i]);
 	    }
 	    break;
 	  case INT_NOIZ:
 	    for ( i = 0; i < HSMHVNSRCS; i++ ) {
-	      (void) sprintf(name, "onoise_total.%s%s", 
-			     here->HSMHVname, HSMHVnNames[i]);
-	      data->namelist = TREALLOC(IFuid, data->namelist, data->numPlots + 1);
-	      if (!data->namelist)
-		return(E_NOMEM);
-	      (*(SPfrontEnd->IFnewUid)) 
-		(ckt, &(data->namelist[data->numPlots++]),
-		 (IFuid) NULL, name, UID_OTHER, NULL);
-	      
-	      (void) sprintf(name, "inoise_total.%s%s", 
-			     here->HSMHVname, HSMHVnNames[i]);
-	      data->namelist = TREALLOC(IFuid, data->namelist, data->numPlots + 1);
-	      if (!data->namelist)
-		return(E_NOMEM);
-	      (*(SPfrontEnd->IFnewUid)) 
-		(ckt, &(data->namelist[data->numPlots++]),
-		 (IFuid) NULL, name, UID_OTHER, NULL);
+	      NOISE_ADD_OUTVAR(ckt, data, "onoise_total.%s%s", here->HSMHVname, HSMHVnNames[i]);
+	      NOISE_ADD_OUTVAR(ckt, data, "inoise_total.%s%s", here->HSMHVname, HSMHVnNames[i]);
 	    }
 	    break;
 	  }
@@ -122,17 +99,17 @@ int HSMHVnoise (
 
          /* rs/rd thermal noise */
 	  if ( model->HSMHV_corsrd == 1 || model->HSMHV_corsrd == 3 ) {
-	    NevalSrc(&noizDens[HSMHVRDNOIZ], (double*) NULL,
+	    NevalSrc(&noizDens[HSMHVRDNOIZ], NULL,
 		     ckt, N_GAIN,
 		     here->HSMHVdNodePrime, here->HSMHVdNode,
-		     (double) 0.0);
+		     0.0);
 	    noizDens[HSMHVRDNOIZ] *= 4 * C_KB * TTEMP * here->HSMHVdrainConductance ;
             lnNdens[HSMHVRDNOIZ] = log( MAX(noizDens[HSMHVRDNOIZ],N_MINLOG) );
 	    
-	    NevalSrc(&noizDens[HSMHVRSNOIZ], (double*) NULL,
+	    NevalSrc(&noizDens[HSMHVRSNOIZ], NULL,
 		     ckt, N_GAIN,
 		     here->HSMHVsNodePrime, here->HSMHVsNode,
-		     (double) 0.0);
+		     0.0);
 	    noizDens[HSMHVRSNOIZ] *= 4 * C_KB * TTEMP * here->HSMHVsourceConductance ;
             lnNdens[HSMHVRSNOIZ] = log( MAX(noizDens[HSMHVRSNOIZ],N_MINLOG) );
 	  } else {
@@ -143,10 +120,10 @@ int HSMHVnoise (
 	  }
 
 	  /* channel thermal noise */
-	  NevalSrc(&noizDens[HSMHVIDNOIZ], (double*) NULL,
+	  NevalSrc(&noizDens[HSMHVIDNOIZ], NULL,
 		   ckt, N_GAIN,
 		   here->HSMHVdNodePrime, here->HSMHVsNodePrime,
-		   (double) 0.0);
+		   0.0);
 	  switch( model->HSMHV_noise ) {
 	  case 1:
 	    /* HiSIMHV model */
@@ -157,10 +134,10 @@ int HSMHVnoise (
 	  }
 
 	  /* flicker noise */
-	  NevalSrc(&noizDens[HSMHVFLNOIZ], (double*) NULL,
+	  NevalSrc(&noizDens[HSMHVFLNOIZ], NULL,
 		   ckt, N_GAIN,
 		   here->HSMHVdNodePrime, here->HSMHVsNodePrime, 
-		   (double) 0.0);
+		   0.0);
 	  switch ( model->HSMHV_noise ) {
 	  case 1:
 	    /* HiSIM model */
@@ -170,10 +147,10 @@ int HSMHVnoise (
 	  }	  
 
 	  /* induced gate noise */
-	  NevalSrc(&noizDens[HSMHVIGNOIZ], (double*) NULL,
+	  NevalSrc(&noizDens[HSMHVIGNOIZ], NULL,
 		   ckt, N_GAIN, 
 		   here->HSMHVdNodePrime, here->HSMHVsNodePrime, 
-		   (double) 0.0);
+		   0.0);
 	  switch ( model->HSMHV_noise ) {
 	  case 1:
 	    /* HiSIM model */

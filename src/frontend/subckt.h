@@ -6,7 +6,9 @@
 #ifndef ngspice_SUBCKT_H
 #define ngspice_SUBCKT_H
 
-struct line * inp_subcktexpand(struct line *deck);
-struct line * inp_deckcopy(struct line *deck);
+struct card *inp_subcktexpand(struct card *deck);
+struct card *inp_deckcopy(struct card *deck);
+struct card *inp_deckcopy_oc(struct card *deck);
+struct card *inp_deckcopy_ln(struct card *deck);
 
 #endif

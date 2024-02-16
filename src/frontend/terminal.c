@@ -13,17 +13,6 @@ Author: 1986 Wayne A. Christopher, U. C. Berkeley CAD Group
 #include <stdarg.h>
 
 
-#ifdef HAVE_ASPRINTF
-#ifdef HAVE_LIBIBERTY_H /* asprintf */
-#include <libiberty.h>
-#elif defined(__MINGW32__) || defined(__SUNPRO_C)
-/* we have asprintf, but not libiberty.h */
-#include <stdarg.h>
-extern int asprintf(char **out, const char *fmt, ...);
-extern int vasprintf(char **out, const char *fmt, va_list ap);
-#endif
-#endif
-
 #ifdef HAVE_SGTTY_H
 #include <sgtty.h>
 #endif
@@ -32,14 +21,12 @@ extern int vasprintf(char **out, const char *fmt, va_list ap);
 #include <sys/ioctl.h>
 #endif
 
-#if 0
-/* Bad interaction with bool type in bool.h because curses also
-   defines this symbol. */
+
 #ifdef HAVE_TERMCAP
 #include <curses.h>
 #include <term.h>
 #endif
-#endif
+
 
 #ifdef HAVE_TERMCAP_H
 #include <termcap.h>
@@ -53,7 +40,7 @@ extern int vasprintf(char **out, const char *fmt, va_list ap);
 #include "terminal.h"
 
 
-bool out_moremode = TRUE;
+bool out_moremode = FALSE;
 bool out_isatty = TRUE;
 
 #ifndef TCL_MODULE
@@ -84,10 +71,10 @@ out_init(void)
 
     noprint = nopause = FALSE;
 
-    if (cp_getvar("nomoremode", CP_BOOL, NULL))
-        out_moremode = FALSE;
-    else
+    if (cp_getvar("moremode", CP_BOOL, NULL, 0))
         out_moremode = TRUE;
+    else
+        out_moremode = FALSE;
 
     if (!out_moremode || !cp_interactive)
         out_isatty = FALSE;
@@ -110,9 +97,9 @@ out_init(void)
 #endif
 
     if (!xsize)
-        (void) cp_getvar("width", CP_NUM, &xsize);
+        (void) cp_getvar("width", CP_NUM, &xsize, 0);
     if (!ysize)
-        (void) cp_getvar("height", CP_NUM, &ysize);
+        (void) cp_getvar("height", CP_NUM, &ysize, 0);
 
     if (!xsize)
         xsize = DEF_SCRWIDTH;
@@ -262,20 +249,9 @@ out_send(char *string)
 void
 out_vprintf(const char *fmt, va_list ap)
 {
-#if defined(HAVE_ASPRINTF) /* seems the best solution */
-    char * tbuf;
-    vasprintf(&tbuf, fmt, ap);
+    char *tbuf = tvprintf(fmt, ap);
     out_send(tbuf);
     FREE(tbuf);
-#elif defined(HAVE_SNPRINTF) /* the second best */
-    static char out_pbuf[8*BSIZE_SP];
-    vsnprintf(out_pbuf, sizeof(out_pbuf), fmt, ap);
-    out_send(out_pbuf);
-#else /* guaranteed a bug for long messages */
-    static char out_pbuf[8*BSIZE_SP];
-    vsprintf(out_pbuf, fmt, ap);
-    out_send(out_pbuf);
-#endif
 }
 
 
@@ -327,14 +303,14 @@ tcap_init(void)
         if ((s = getenv("COLS")) != NULL)
             xsize = atoi(s);
         if (xsize <= 0)
-            xsize = 0;
+            xsize = DEF_SCRWIDTH;
     }
 
     if (!ysize) {
         if ((s = getenv("LINES")) != NULL)
             ysize = atoi(s);
         if (ysize <= 0)
-            ysize = 0;
+            ysize = DEF_SCRHEIGHT;
     }
 }
 

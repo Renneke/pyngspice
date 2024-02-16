@@ -10,8 +10,8 @@
 #ifndef HAVE_LIBGC
 
 extern void *tmalloc(size_t num);
-extern void *trealloc(void *str, size_t num);
-extern void txfree(void *ptr);
+extern void *trealloc(const void *str, size_t num);
+extern void txfree(const void *ptr);
 
 #define tfree(x) (txfree(x), (x) = 0)
 
@@ -27,18 +27,10 @@ extern void txfree(void *ptr);
 #endif /* HAVE_LIBGC */
 
 
-#include "ngspice/stringutil.h" /* va: spice3 internally bzero */
+#include "ngspice/stringutil.h"
 
-#define alloc(TYPE)      TMALLOC(TYPE, 1)
-#define MALLOC(x)        tmalloc((size_t) (x))
 #define FREE(x)          do { if(x) { txfree(x); (x) = NULL; } } while(0)
-#define REALLOC(x, y)    trealloc(x, (size_t) (y))
-#define ZERO(PTR, TYPE)  bzero(PTR, sizeof(TYPE))
-
-
-#if defined(_MSC_VER) || defined(__MINGW32__)
-void *hrealloc(void *ptr, size_t num);
-#endif
+#define ZERO(PTR, TYPE)  memset(PTR, 0, sizeof(TYPE))
 
 
 #ifdef CIDER
@@ -52,8 +44,8 @@ void *hrealloc(void *ptr, size_t num);
 #define XALLOC(ptr, type, number)                                       \
     do {                                                                \
         if ((number) && (ptr = (type *)calloc((size_t)(number), sizeof(type))) == NULL) { \
-            SPfrontEnd->IFerror(E_PANIC, "Out of Memory", NULL);        \
-            exit(1);                                                    \
+            SPfrontEnd->IFerrorf(E_PANIC, "Out of Memory");             \
+            controlled_exit(1);                                         \
         }                                                               \
     } while(0)
 
@@ -61,7 +53,7 @@ void *hrealloc(void *ptr, size_t num);
     do {                                                                \
         if ((number) && (ptr = (type *)calloc((size_t)(number), sizeof(type))) == NULL) { \
             fprintf(stderr, "Out of Memory\n");                         \
-            exit(1);                                                    \
+            controlled_exit(1);                                         \
         }                                                               \
     } while(0)
 

@@ -19,7 +19,8 @@ AUTHORS
 
 MODIFICATIONS
 
-    <date> <person name> <nature of modifications>
+    01/17/14 Holger Vogt
+    Add function cm_get_path
 
 SUMMARY
 
@@ -47,6 +48,7 @@ NON-STANDARD FEATURES
 
 #include  <stdio.h>
 #include "ngspice/cmtypes.h"
+#include "ngspice/cktdefs.h"
 
 
 void cm_climit_fcn(double in, double in_offset, double cntl_upper, 
@@ -84,6 +86,13 @@ int  cm_event_queue(double time);
 char *cm_message_get_errmsg(void);
 int  cm_message_send(char *msg);
 
+#ifdef __GNUC__
+int cm_message_printf(const char *fmt, ...) __attribute__ ((format (__printf__, 1, 2)));
+#else
+int cm_message_printf(const char *fmt, ...);
+#endif
+
+
 double cm_netlist_get_c(void);
 double cm_netlist_get_l(void);
 
@@ -93,15 +102,20 @@ Complex_t cm_complex_subtract(Complex_t x, Complex_t y);
 Complex_t cm_complex_multiply(Complex_t x, Complex_t y);
 Complex_t cm_complex_divide(Complex_t x, Complex_t y);
 
+char *cm_get_path(void);
+CKTcircuit *cm_get_circuit(void);
+
 FILE *cm_stream_out(void);
 FILE *cm_stream_in(void);
 FILE *cm_stream_err(void);
 
 void *malloc_pj(size_t s);
 void *calloc_pj(size_t s1, size_t s2);
-void *realloc_pj(void *ptr, size_t s);
-void  free_pj(void *ptr);
+void *realloc_pj(const void *ptr, size_t s);
+void  free_pj(const void *ptr);
 
 FILE *fopen_with_path(const char *path, const char *mode);
 
-#endif
+#define CM_IGNORE(x) (void) (x)
+
+#endif /* include guard */

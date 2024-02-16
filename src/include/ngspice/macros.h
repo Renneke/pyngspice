@@ -24,7 +24,6 @@
 
 #define eq(a,b)  (!strcmp((a), (b)))
 #define eqc(a,b)  (cieq((a), (b)))
-#define isalphanum(c)   (isalpha(c) || isdigit(c))
 #define hexnum(c) ((((c) >= '0') && ((c) <= '9')) ? ((c) - '0') : ((((c) >= \
         'a') && ((c) <= 'f')) ? ((c) - 'a' + 10) : ((((c) >= 'A') && \
         ((c) <= 'F')) ? ((c) - 'A' + 10) : 0)))
@@ -35,12 +34,21 @@
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 #define ABS(a)    ((a) < 0.0 ? -(a) : (a))
-#define SGN(a)    ((a) < 0.0 ? -(1.0) : (1.0))
-#define SIGN(a,b) ( b >= 0 ? (a >= 0 ? a : - a) : (a >= 0 ? - a : a))
-#define  SWAP(type, a, b)   {type swapx; swapx = a; a = b; b = swapx;}
+#define SGN(a)    copysign(1.0, (a))
+#define SWAP(type, a, b)                        \
+    do {                                        \
+        type SWAP_macro_local = a;              \
+        a = b;                                  \
+        b = SWAP_macro_local;                   \
+    } while(0)
  
  
-#define ABORT() fflush(stderr);fflush(stdout);abort();
+#define ABORT()                                 \
+    do {                                        \
+        fflush(stderr);                         \
+        fflush(stdout);                         \
+        abort();                                \
+    } while(0)
 
 #define MERROR(CODE, MESSAGE) \
     do {                                                      \
@@ -48,9 +56,6 @@
         strcpy(errMsg, (MESSAGE));                            \
         return (CODE);                                        \
     } while(0)
-
-#define	NEW(TYPE)	(TMALLOC(TYPE, 1))
-#define	NEWN(TYPE,COUNT) (TMALLOC(TYPE, COUNT))
 
 
 #define	R_NORM(A,B) {					      \

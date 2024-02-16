@@ -27,19 +27,16 @@ CCCSsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
     NG_IGNORE(states);
 
     /*  loop through all the voltage source models */
-    for( ; model != NULL; model = model->CCCSnextModel ) {
+    for( ; model != NULL; model = CCCSnextModel(model)) {
 
         /* loop through all the instances of the model */
-        for (here = model->CCCSinstances; here != NULL ;
-                here=here->CCCSnextInstance) {
+        for (here = CCCSinstances(model); here != NULL ;
+                here=CCCSnextInstance(here)) {
             
             here->CCCScontBranch = CKTfndBranch(ckt,here->CCCScontName);
             if(here->CCCScontBranch == 0) {
-                IFuid namarray[2];
-                namarray[0] = here->CCCSname;
-                namarray[1] = here->CCCScontName;
-                SPfrontEnd->IFerror (ERR_FATAL,
-                        "%s: unknown controlling source %s",namarray);
+                SPfrontEnd->IFerrorf (ERR_FATAL,
+                        "%s: unknown controlling source %s", here->CCCSname, here->CCCScontName);
                 return(E_BADPARM);
             }
 
@@ -49,8 +46,8 @@ do { if((here->ptr = SMPmakeElt(matrix, here->first, here->second)) == NULL){\
     return(E_NOMEM);\
 } } while(0)
 
-            TSTALLOC(CCCSposContBrptr,CCCSposNode,CCCScontBranch);
-            TSTALLOC(CCCSnegContBrptr,CCCSnegNode,CCCScontBranch);
+            TSTALLOC(CCCSposContBrPtr,CCCSposNode,CCCScontBranch);
+            TSTALLOC(CCCSnegContBrPtr,CCCSnegNode,CCCScontBranch);
         }
     }
     return(OK);

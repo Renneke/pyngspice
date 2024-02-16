@@ -2,9 +2,6 @@
 Copyright 1990 Regents of the University of California.  All rights reserved.
 Author: 1987 Kanwar Jit Singh
 **********/
-/*
- * singh@ic.Berkeley.edu
- */
 
 #include "ngspice/ngspice.h"
 #include "ngspice/cktdefs.h"
@@ -17,23 +14,22 @@ Author: 1987 Kanwar Jit Singh
 int
 ASRCfindBr(CKTcircuit *ckt, GENmodel *inputModel, IFuid name)
 {
+    ASRCmodel *model = (ASRCmodel*) inputModel;
     ASRCinstance *here;
-    ASRCmodel *model = (ASRCmodel*)inputModel;
     int error;
     CKTnode *tmp;
 
-    for( ; model != NULL; model = model->ASRCnextModel) {
-        for (here = model->ASRCinstances; here != NULL;
-                here = here->ASRCnextInstance) {
-            if(here->ASRCname == name) {
-                if(here->ASRCbranch == 0) {
-                    error = CKTmkCur(ckt,&tmp, here->ASRCname,"branch");
-                    if(error) return(error);
+    for (; model; model = ASRCnextModel(model))
+        for (here = ASRCinstances(model); here; here = ASRCnextInstance(here))
+            if (here->ASRCname == name) {
+                if (here->ASRCbranch == 0) {
+                    error = CKTmkCur(ckt, &tmp, here->ASRCname, "branch");
+                    if (error)
+                        return(error);
                     here->ASRCbranch = tmp->number;
                 }
                 return(here->ASRCbranch);
             }
-        }
-    }
+
     return(0);
 }

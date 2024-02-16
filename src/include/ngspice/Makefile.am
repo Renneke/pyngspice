@@ -1,11 +1,9 @@
 ## Process this file with automake to produce Makefile.in
 
-includedir = $(pkgdatadir)/include/ngspice
-
 nodist_include_HEADERS = \
 	config.h
 
-include_HEADERS = \
+noinst_HEADERS = \
 	tclspice.h	\
 	acdefs.h	\
 	bdrydefs.h	\
@@ -37,8 +35,11 @@ include_HEADERS = \
 	dvec.h		\
 	elctdefs.h	\
 	enh.h		\
+	enhtypes.h	\
 	evt.h		\
 	evtproto.h	\
+	evttypes.h	\
+	evtshared.h	\
 	evtudn.h	\
 	ftedbgra.h	\
 	ftedebug.h	\
@@ -100,6 +101,7 @@ include_HEADERS = \
 	profile.h	\
 	pssdefs.h	\
 	pzdefs.h	\
+	randnumb.h	\
 	sen2defs.h	\
 	sensdefs.h	\
 	sensgen.h	\
@@ -108,6 +110,7 @@ include_HEADERS = \
 	smpdefs.h	\
 	sperror.h	\
 	spmatrix.h	\
+	stringskip.h	\
 	stringutil.h	\
 	suffix.h	\
 	swec.h		\
@@ -123,6 +126,12 @@ include_HEADERS = \
 	FastNorm3.h	\
 	fftext.h	\
 	wallace.h	\
+	wincolornames.h	\
 	wstdio.h
+
+if SHARED_MODULE
+pkginclude_HEADERS = \
+	sharedspice.h
+endif SHARED_MODULE
 
 MAINTAINERCLEANFILES = Makefile.in

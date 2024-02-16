@@ -15,6 +15,7 @@ Author: 1986 Wayne A. Christopher, U. C. Berkeley CAD Group
 #include "ngspice/cpdefs.h"
 #include "ngspice/hlpdefs.h"
 #include "ngspice/suffix.h"
+#include "ngspice/stringskip.h"
 
 static topic *curtop;
 static bool quitflag;
@@ -72,8 +73,7 @@ hlp_thandle(topic **parent)
             return (NULL);
         }
 
-        for (s = buf; *s && isspace(*s); s++)
-            ;
+        s = skip_ws(buf);
         switch (*s) {
         case '?':
             fprintf(cp_out,
@@ -102,7 +102,7 @@ hlp_thandle(topic **parent)
             *parent = curtop;
             return (NULL);
         }
-        if (!isdigit(*s)) {
+        if (!isdigit_c(*s)) {
             fprintf(cp_err, "Invalid command\n");
             continue;
         }

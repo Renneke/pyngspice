@@ -35,8 +35,6 @@ NUMDsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
   MODLcard *models;
   OPTNcard *options;
   OUTPcard *outputs;
-  char *icFileName = NULL;
-  size_t nameLen;
   int error;
   int xMeshSize;
   ONEdevice *pDevice;
@@ -49,7 +47,7 @@ NUMDsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
 
 
   /* loop through all the models */
-  for (; model != NULL; model = model->NUMDnextModel) {
+  for (; model != NULL; model = NUMDnextModel(model)) {
     if (!model->NUMDpInfo) {
       TSCALLOC(model->NUMDpInfo, 1, ONEtranInfo);
     }
@@ -143,8 +141,8 @@ NUMDsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
     model->NUMDdopTables = dopTableList;
 
     /* loop through all the instances of the model */
-    for (inst = model->NUMDinstances; inst != NULL;
-	inst = inst->NUMDnextInstance) {
+    for (inst = NUMDinstances(model); inst != NULL;
+         inst = NUMDnextInstance(inst)) {
 
       startTime = SPfrontEnd->IFseconds();
 
@@ -155,16 +153,9 @@ NUMDsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
       }
       if ((!inst->NUMDicFileGiven)) {
 	if (options->OPTNunique) {
-	  nameLen = strlen(options->OPTNicFile) + strlen(inst->NUMDname) + 1;
-	  TSCALLOC(icFileName, nameLen+1, char);
-	  sprintf(icFileName, "%s.%s", options->OPTNicFile, inst->NUMDname);
-	  icFileName[nameLen] = '\0';
-          inst->NUMDicFile = icFileName;
+	  inst->NUMDicFile = tprintf("%s.%s", options->OPTNicFile, inst->NUMDname);
 	} else if (options->OPTNicFile != NULL) {
-	  nameLen = strlen(options->OPTNicFile);
-	  TSCALLOC(icFileName, nameLen+1, char);
-	  icFileName = strcpy(icFileName, options->OPTNicFile);
-	  inst->NUMDicFile = icFileName;
+	  inst->NUMDicFile = tprintf("%s", options->OPTNicFile);
 	} else {
 	  inst->NUMDicFile = NULL;
 	}
@@ -195,7 +186,7 @@ NUMDsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
 	    pMaterial = pMaterial->next;
 	  }
 	  /* Copy everything, then fix the incorrect pointer. */
-	  bcopy(pM, pMaterial, sizeof(ONEmaterial));
+	  memcpy(pMaterial, pM, sizeof(ONEmaterial));
 	  pMaterial->next = NULL;
 	}
 
@@ -209,7 +200,7 @@ NUMDsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)
       ONEgetStatePointers(inst->NUMDpDevice, states);
 
       /* Wipe out statistics from previous runs (if any). */
-      bzero(inst->NUMDpDevice->pStats, sizeof(ONEstats));
+      memset(inst->NUMDpDevice->pStats, 0, sizeof(ONEstats));
 
       inst->NUMDpDevice->pStats->totalTime[STAT_SETUP] +=
 	  SPfrontEnd->IFseconds() - startTime;

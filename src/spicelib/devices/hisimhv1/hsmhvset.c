@@ -4,11 +4,11 @@
  Copyright (C) 2012 Hiroshima University & STARC
 
  MODEL NAME : HiSIM_HV 
- ( VERSION : 1  SUBVERSION : 2  REVISION : 3 )
+ ( VERSION : 1  SUBVERSION : 2  REVISION : 4 )
  Model Parameter VERSION : 1.23
  FILE : hsmhvset.c
 
- DATE : 2012.4.6
+ DATE : 2013.04.30
 
  released by 
                 Hiroshima University &
@@ -64,7 +64,7 @@ int HSMHVsetup(
   double Lbin=0.0, Wbin=0.0, LWbin =0.0; /* binning */
   
   /*  loop through all the HSMHV device models */
-  for ( ;model != NULL ;model = model->HSMHVnextModel ) {
+  for ( ;model != NULL ;model = HSMHVnextModel(model)) {
     /* Default value Processing for HVMOS Models */
     if ( !model->HSMHV_type_Given )
       model->HSMHV_type = NMOS ;
@@ -74,13 +74,12 @@ int HSMHVsetup(
     model->HSMHV_noise = 1;
 
     if ( !model->HSMHV_version_Given) {
-        model->HSMHV_version = "1.23" ;
-       printf("          1.23 is selected for VERSION. (default) \n");
+        model->HSMHV_version = "1.24" ;
+       printf("          1.24 is selected for VERSION. (default) \n");
     } else {
-      if (strcmp(model->HSMHV_version,"1.23") != 0 ) {
-       model->HSMHV_version = "1.23" ;
-       printf("          1.23 is the only available VERSION. \n");
-       printf("          1.23 is selected for VERSION. (default) \n");
+      if (strncmp(model->HSMHV_version,"1.24", 4) != 0 ) {
+       model->HSMHV_version = "1.24" ;
+       printf("          1.24 is selected for VERSION. (default) \n");
       } else {
        printf("           %s is selected for VERSION \n", model->HSMHV_version);
       }
@@ -416,7 +415,7 @@ int HSMHVsetup(
     if ( !model->HSMHV_rdsp_Given     ) model->HSMHV_rdsp      = 1.0 ;
     if ( !model->HSMHV_rdtemp1_Given  ) model->HSMHV_rdtemp1   = 0.0 ;
     if ( !model->HSMHV_rdtemp2_Given  ) model->HSMHV_rdtemp2   = 0.0 ;
-                                        model->HSMHV_rth0r     = 0.0 ; /* not used in this version */
+    model->HSMHV_rth0r     = 0.0 ; /* not used in this version */
     if ( !model->HSMHV_rdvdtemp1_Given) model->HSMHV_rdvdtemp1 = 0.0 ;
     if ( !model->HSMHV_rdvdtemp2_Given) model->HSMHV_rdvdtemp2 = 0.0 ;
     if ( !model->HSMHV_rth0w_Given    ) model->HSMHV_rth0w     = 0.0 ;
@@ -744,6 +743,11 @@ int HSMHVsetup(
     if (!model->HSMHVvdsMaxGiven) model->HSMHVvdsMax = 1e99;
     if (!model->HSMHVvbsMaxGiven) model->HSMHVvbsMax = 1e99;
     if (!model->HSMHVvbdMaxGiven) model->HSMHVvbdMax = 1e99;
+    if (!model->HSMHVvgsrMaxGiven) model->HSMHVvgsrMax = 1e99;
+    if (!model->HSMHVvgdrMaxGiven) model->HSMHVvgdrMax = 1e99;
+    if (!model->HSMHVvgbrMaxGiven) model->HSMHVvgbrMax = 1e99;
+    if (!model->HSMHVvbsrMaxGiven) model->HSMHVvbsrMax = 1e99;
+    if (!model->HSMHVvbdrMaxGiven) model->HSMHVvbdrMax = 1e99;
 
     /* For Symmetrical Device */
     if (  model->HSMHV_cosym ) {
@@ -775,8 +779,8 @@ int HSMHVsetup(
     modelMKS = &model->modelMKS ;
 
     /* loop through all the instances of the model */
-    for ( here = model->HSMHVinstances ;here != NULL ;
-         here = here->HSMHVnextInstance ) {
+    for ( here = HSMHVinstances(model);here != NULL ;
+         here = HSMHVnextInstance(here)) {
       /* allocate a chunk of the state vector */
       here->HSMHVstates = *states;
       if (model->HSMHV_conqs)
@@ -841,7 +845,7 @@ int HSMHVsetup(
 
       if (  model->HSMHV_cosym ) {
          if ( !here->HSMHV_lovers_Given   && !model->HSMHV_lovers_Given ) here->HSMHV_lovers = here->HSMHV_loverld ;
-                                                                          here->HSMHV_lover  = here->HSMHV_lovers ;
+         here->HSMHV_lover  = here->HSMHV_lovers ;
          if ( !here->HSMHV_ldrift1s_Given && !model->HSMHV_ldrift1s_Given ) here->HSMHV_ldrift1s = here->HSMHV_ldrift1 ;
          if ( !here->HSMHV_ldrift2s_Given && !model->HSMHV_ldrift2s_Given ) here->HSMHV_ldrift2s = here->HSMHV_ldrift2 ;
       }
@@ -916,10 +920,27 @@ int HSMHVsetup(
 	here->HSMHVdbNode = here->HSMHVbNodePrime = here->HSMHVsbNode = here->HSMHVbNode;
       }
 
+      here->HSMHVtempNode = here->HSMHVtempNodeExt;
+      here->HSMHVsubNode = here->HSMHVsubNodeExt;
+
+      if ( here->HSMHV_cosubnode == 0 && here->HSMHVsubNode >= 0 ) {
+        if ( here->HSMHVtempNode >= 0 ) {
+       /* FATAL Error when 6th node is defined and COSUBNODE=0 */
+          SPfrontEnd->IFerrorf
+            (
+             ERR_FATAL,
+             "HiSIM_HV: MOSFET(%s) MODEL(%s): 6th node is defined and COSUBNODE=0",
+             here->HSMHVname, model->HSMHVmodName
+             );
+          return (E_BADPARM);
+        } else {
+
       /* 5th node is switched to tempNode, if COSUBNODE=0 and 5 external nodes are assigned. */
-      if ( here->HSMHV_cosubnode == 0 && here->HSMHVsubNode > 0 && here->HSMHVtempNode <= 0 ) {
-	here->HSMHVtempNode = here->HSMHVsubNode ;
-	here->HSMHVsubNode  = -1 ; 
+          if ( here->HSMHVsubNode > 0 ) {
+    	    here->HSMHVtempNode = here->HSMHVsubNode ;
+	    here->HSMHVsubNode  = -1 ;
+          }
+        }
       }
 
       /* self heating*/
@@ -945,7 +966,7 @@ int HSMHVsetup(
       
       /* macro to make elements with built in test for out of memory */
 #define TSTALLOC(ptr,first,second) \
-do { if((here->ptr = SMPmakeElt(matrix,here->first,here->second))==(double *)NULL){\
+do { if((here->ptr = SMPmakeElt(matrix,here->first,here->second))==NULL){\
     return(E_NOMEM);\
 } } while(0)
 
@@ -1086,98 +1107,98 @@ do { if((here->ptr = SMPmakeElt(matrix,here->first,here->second))==(double *)NUL
       Wbin = pow(WG, model->HSMHV_wbinn) ;
       LWbin = Lbin * Wbin ;
 
-      BINNING(vmax)
-      BINNING(bgtmp1)
-      BINNING(bgtmp2)
-      BINNING(eg0)
-      BINNING(vfbover)
-      BINNING(nover)
-      BINNING(novers)
-      BINNING(wl2)
-      BINNING(vfbc)
-      BINNING(nsubc)
-      BINNING(nsubp)
-      BINNING(scp1)
-      BINNING(scp2)
-      BINNING(scp3)
-      BINNING(sc1)
-      BINNING(sc2)
-      BINNING(sc3)
-      BINNING(pgd1)
-      BINNING(pgd3)
-      BINNING(ndep)
-      BINNING(ninv)
-      BINNING(muecb0)
-      BINNING(muecb1)
-      BINNING(mueph1)
-      BINNING(vtmp)
-      BINNING(wvth0)
-      BINNING(muesr1)
-      BINNING(muetmp)
-      BINNING(sub1)
-      BINNING(sub2)
-      BINNING(svds)
-      BINNING(svbs)
-      BINNING(svgs)
-      BINNING(fn1)
-      BINNING(fn2)
-      BINNING(fn3)
-      BINNING(fvbs)
-      BINNING(nsti)
-      BINNING(wsti)
-      BINNING(scsti1)
-      BINNING(scsti2)
-      BINNING(vthsti)
-      BINNING(muesti1)
-      BINNING(muesti2)
-      BINNING(muesti3)
-      BINNING(nsubpsti1)
-      BINNING(nsubpsti2)
-      BINNING(nsubpsti3)
-      BINNING(cgso)
-      BINNING(cgdo)
-      BINNING(js0)
-      BINNING(js0sw)
-      BINNING(nj)
-      BINNING(cisbk)
-      BINNING(clm1)
-      BINNING(clm2)
-      BINNING(clm3)
-      BINNING(wfc)
-      BINNING(gidl1)
-      BINNING(gidl2)
-      BINNING(gleak1)
-      BINNING(gleak2)
-      BINNING(gleak3)
-      BINNING(gleak6)
-      BINNING(glksd1)
-      BINNING(glksd2)
-      BINNING(glkb1)
-      BINNING(glkb2)
-      BINNING(nftrp)
-      BINNING(nfalp)
-      BINNING(pthrou)
-      BINNING(vdiffj)
-      BINNING(ibpc1)
-      BINNING(ibpc2)
-      BINNING(cgbo)
-      BINNING(cvdsover)
-      BINNING(falph)
-      BINNING(npext)
-      BINNING(powrat)
-      BINNING(rd)
-      BINNING(rd22)
-      BINNING(rd23)
-      BINNING(rd24)
-      BINNING(rdict1)
-      BINNING(rdov13)
-      BINNING(rdslp1)
-      BINNING(rdvb)
-      BINNING(rdvd)
-      BINNING(rdvg11)
-      BINNING(rs)
-      BINNING(rth0)
-      BINNING(vover)
+      BINNING(vmax);
+      BINNING(bgtmp1);
+      BINNING(bgtmp2);
+      BINNING(eg0);
+      BINNING(vfbover);
+      BINNING(nover);
+      BINNING(novers);
+      BINNING(wl2);
+      BINNING(vfbc);
+      BINNING(nsubc);
+      BINNING(nsubp);
+      BINNING(scp1);
+      BINNING(scp2);
+      BINNING(scp3);
+      BINNING(sc1);
+      BINNING(sc2);
+      BINNING(sc3);
+      BINNING(pgd1);
+      BINNING(pgd3);
+      BINNING(ndep);
+      BINNING(ninv);
+      BINNING(muecb0);
+      BINNING(muecb1);
+      BINNING(mueph1);
+      BINNING(vtmp);
+      BINNING(wvth0);
+      BINNING(muesr1);
+      BINNING(muetmp);
+      BINNING(sub1);
+      BINNING(sub2);
+      BINNING(svds);
+      BINNING(svbs);
+      BINNING(svgs);
+      BINNING(fn1);
+      BINNING(fn2);
+      BINNING(fn3);
+      BINNING(fvbs);
+      BINNING(nsti);
+      BINNING(wsti);
+      BINNING(scsti1);
+      BINNING(scsti2);
+      BINNING(vthsti);
+      BINNING(muesti1);
+      BINNING(muesti2);
+      BINNING(muesti3);
+      BINNING(nsubpsti1);
+      BINNING(nsubpsti2);
+      BINNING(nsubpsti3);
+      BINNING(cgso);
+      BINNING(cgdo);
+      BINNING(js0);
+      BINNING(js0sw);
+      BINNING(nj);
+      BINNING(cisbk);
+      BINNING(clm1);
+      BINNING(clm2);
+      BINNING(clm3);
+      BINNING(wfc);
+      BINNING(gidl1);
+      BINNING(gidl2);
+      BINNING(gleak1);
+      BINNING(gleak2);
+      BINNING(gleak3);
+      BINNING(gleak6);
+      BINNING(glksd1);
+      BINNING(glksd2);
+      BINNING(glkb1);
+      BINNING(glkb2);
+      BINNING(nftrp);
+      BINNING(nfalp);
+      BINNING(pthrou);
+      BINNING(vdiffj);
+      BINNING(ibpc1);
+      BINNING(ibpc2);
+      BINNING(cgbo);
+      BINNING(cvdsover);
+      BINNING(falph);
+      BINNING(npext);
+      BINNING(powrat);
+      BINNING(rd);
+      BINNING(rd22);
+      BINNING(rd23);
+      BINNING(rd24);
+      BINNING(rdict1);
+      BINNING(rdov13);
+      BINNING(rdslp1);
+      BINNING(rdvb);
+      BINNING(rdvd);
+      BINNING(rdvg11);
+      BINNING(rs);
+      BINNING(rth0);
+      BINNING(vover);
 
       /*-----------------------------------------------------------*
        * Range check of model parameters
@@ -1320,7 +1341,7 @@ do { if((here->ptr = SMPmakeElt(matrix,here->first,here->second))==(double *)NUL
     RANGECHECK(model->HSMHV_sub2l,      0.0,      1.0, "SUB2L") ;
     RANGECHECK(model->HSMHV_voverp,     0.0,      2.0, "VOVERP") ;
     RANGECHECK(model->HSMHV_qme1,       0.0, 300.0e-9, "QME1") ;
-    RANGECHECK(model->HSMHV_qme2,       0.0,      2.0, "QME2") ;
+    RANGECHECK(model->HSMHV_qme2,       0.0,      3.0, "QME2") ;
     RANGECHECK(model->HSMHV_qme3,       0.0,800.0e-12, "QME3") ;
     RANGECHECK(model->HSMHV_glpart1,    0.0,      1.0, "GLPART1") ;
     RANGECHECK(model->HSMHV_tnom,      22.0,     32.0, "TNOM") ;
@@ -1432,12 +1453,12 @@ do { if((here->ptr = SMPmakeElt(matrix,here->first,here->second))==(double *)NUL
     ckt->CKTbypass = 0 ;
   }  
   /* check ckt->CKTintegrateMethod */
-  if( ckt->CKTintegrateMethod == TRAPEZOIDAL ) { /* TRAPEZODAL:1 GEAR:2 */
-    fprintf( stderr, "\nwarning(HiSIMHV): Recommend the Gear method for reliable simulation with '.options METHOD=GEAR'.\n");
-  }
+//  if( ckt->CKTintegrateMethod == TRAPEZOIDAL ) { /* TRAPEZODAL:1 GEAR:2 */
+//    fprintf( stderr, "\nwarning(HiSIMHV): Recommend the Gear method for reliable simulation with '.options METHOD=GEAR'.\n");
+//  }
 
   return(OK);
-} 
+}
 
 int
 HSMHVunsetup(
@@ -1449,47 +1470,57 @@ HSMHVunsetup(
     HSMHVinstance *here;
  
     for (model = (HSMHVmodel *)inModel; model != NULL;
-            model = model->HSMHVnextModel)
+            model = HSMHVnextModel(model))
     {
-        for (here = model->HSMHVinstances; here != NULL;
-                here=here->HSMHVnextInstance)
+        for (here = HSMHVinstances(model); here != NULL;
+                here=HSMHVnextInstance(here))
         {
-            if (here->HSMHVdNodePrime
-                    && here->HSMHVdNodePrime != here->HSMHVdNode)
-            {
-                CKTdltNNum(ckt, here->HSMHVdNodePrime);
-                here->HSMHVdNodePrime = 0;
-            }
-            if (here->HSMHVsNodePrime
-                    && here->HSMHVsNodePrime != here->HSMHVsNode)
-            {
-                CKTdltNNum(ckt, here->HSMHVsNodePrime);
-                here->HSMHVsNodePrime = 0;
-            }
-            if (here->HSMHVgNodePrime
-                    && here->HSMHVgNodePrime != here->HSMHVgNode)
-            {
-                CKTdltNNum(ckt, here->HSMHVgNodePrime);
-                here->HSMHVgNodePrime = 0;
-            }
-            if (here->HSMHVbNodePrime
-                    && here->HSMHVbNodePrime != here->HSMHVbNode)
-            {
-                CKTdltNNum(ckt, here->HSMHVbNodePrime);
-                here->HSMHVbNodePrime = 0;
-            }
-            if (here->HSMHVdbNode
-                    && here->HSMHVdbNode != here->HSMHVbNode)
-            {
-                CKTdltNNum(ckt, here->HSMHVdbNode);
-                here->HSMHVdbNode = 0;
-            }
-            if (here->HSMHVsbNode
+            if (here->HSMHVqbNode > 0)
+                CKTdltNNum(ckt, here->HSMHVqbNode);
+            here->HSMHVqbNode = 0;
+
+            if (here->HSMHVqiNode > 0)
+                CKTdltNNum(ckt, here->HSMHVqiNode);
+            here->HSMHVqiNode = 0;
+
+            if (here->HSMHVtempNode > 0 &&
+                here->HSMHVtempNode != here->HSMHVtempNodeExt &&
+                here->HSMHVtempNode != here->HSMHVsubNodeExt)
+                CKTdltNNum(ckt, here->HSMHVtempNode);
+            here->HSMHVtempNode = 0;
+
+            here->HSMHVsubNode = 0;
+
+            if (here->HSMHVsbNode > 0
                     && here->HSMHVsbNode != here->HSMHVbNode)
-            {
                 CKTdltNNum(ckt, here->HSMHVsbNode);
-                here->HSMHVsbNode = 0;
-            }
+            here->HSMHVsbNode = 0;
+
+            if (here->HSMHVbNodePrime > 0
+                    && here->HSMHVbNodePrime != here->HSMHVbNode)
+                CKTdltNNum(ckt, here->HSMHVbNodePrime);
+            here->HSMHVbNodePrime = 0;
+
+            if (here->HSMHVdbNode > 0
+                    && here->HSMHVdbNode != here->HSMHVbNode)
+                CKTdltNNum(ckt, here->HSMHVdbNode);
+            here->HSMHVdbNode = 0;
+
+            if (here->HSMHVgNodePrime > 0
+                    && here->HSMHVgNodePrime != here->HSMHVgNode)
+                CKTdltNNum(ckt, here->HSMHVgNodePrime);
+            here->HSMHVgNodePrime = 0;
+
+            if (here->HSMHVsNodePrime > 0
+                    && here->HSMHVsNodePrime != here->HSMHVsNode)
+                CKTdltNNum(ckt, here->HSMHVsNodePrime);
+            here->HSMHVsNodePrime = 0;
+
+            if (here->HSMHVdNodePrime > 0
+                    && here->HSMHVdNodePrime != here->HSMHVdNode)
+                CKTdltNNum(ckt, here->HSMHVdNodePrime);
+            here->HSMHVdNodePrime = 0;
+
         }
     }
 #endif

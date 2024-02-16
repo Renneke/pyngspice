@@ -1,26 +1,62 @@
-/**** BSIM4.7.0 Released by Darsen Lu 04/08/2011 ****/
+/* ******************************************************************************
+   *  BSIM4 4.8.1 released by Chetan Kumar Dabhi 2/15/2017                      *
+   *  BSIM4 Model Equations                                                     *
+   ******************************************************************************
 
-/**********
- * Copyright 2006 Regents of the University of California. All rights reserved.
- * File: b4temp.c of BSIM4.7.0.
- * Author: 2000 Weidong Liu
- * Authors: 2001- Xuemei Xi, Mohan Dunga, Ali Niknejad, Chenming Hu.
- * Authors: 2006- Mohan Dunga, Ali Niknejad, Chenming Hu
- * Authors: 2007- Mohan Dunga, Wenwei Yang, Ali Niknejad, Chenming Hu
-  * Authors: 2008- Wenwei Yang, Ali Niknejad, Chenming Hu
- * Project Director: Prof. Chenming Hu.
- * Modified by Xuemei Xi, 04/06/2001.
- * Modified by Xuemei Xi, 10/05/2001.
- * Modified by Xuemei Xi, 11/15/2002.
- * Modified by Xuemei Xi, 05/09/2003.
- * Modified by Xuemei Xi, 03/04/2004.
- * Modified by Xuemei Xi, Mohan Dunga, 07/29/2005.
- * Modified by Mohan Dunga, 12/13/2006.
- * Modified by Mohan Dunga, Wenwei Yang, 05/18/2007.
- * Modified by Wenwei Yang, 07/31/2008.
- * Modified by Tanvir Morshed, Darsen Lu 03/27/2011
- **********/
+   ******************************************************************************
+   *  Copyright 2017 Regents of the University of California.                   *
+   *  All rights reserved.                                                      *
+   *                                                                            *
+   *  Project Director: Prof. Chenming Hu.                                      *
+   *  Authors: Gary W. Ng, Weidong Liu, Xuemei Xi, Mohan Dunga, Wenwei Yang     *
+   *           Ali Niknejad, Shivendra Singh Parihar, Chetan Kumar Dabhi        *
+   *           Yogesh Singh Chauhan, Sayeef Salahuddin, Chenming Hu             *
+   ******************************************************************************
 
+   ******************************************************************************
+   *                          CMC In-Code Statement                             *
+   *                                                                            *
+   *  The Developer agrees that the following statement will appear in the      *
+   *  model code that has been adopted as a CMC Standard.                       *
+   *                                                                            *
+   *  Software is distributed as is, completely without warranty or service     *
+   *  support. The University of California and its employees are not liable    *
+   *  for the condition or performance of the software.                         *
+   *                                                                            *
+   *  The University of California owns the copyright and grants users a        *
+   *  perpetual, irrevocable, worldwide, non-exclusive, royalty-free license    *
+   *  with respect to the software as set forth below.                          *
+   *                                                                            *
+   *  The University of California hereby disclaims all implied warranties.     *
+   *                                                                            *
+   *  The University of California grants the users the right to modify,        *
+   *  copy, and redistribute the software and documentation, both within        *
+   *  the user's organization and externally, subject to the following          *
+   *  restrictions:                                                             *
+   *                                                                            *
+   *  1. The users agree not to charge for the University of California code    *
+   *     itself but may charge for additions, extensions, or support.           *
+   *                                                                            *
+   *  2. In any product based on the software, the users agree to               *
+   *     acknowledge the University of California that developed the            *
+   *     software. This acknowledgment shall appear in the product              *
+   *     documentation.                                                         *
+   *                                                                            *
+   *  3. Redistributions to others of source code and documentation must        *
+   *     retain the copyright notice, disclaimer, and list of conditions.       *
+   *                                                                            *
+   *  4. Redistributions to others in binary form must reproduce the            *
+   *     copyright notice, disclaimer, and list of conditions in the            *
+   *     documentation and/or other materials provided with the                 *
+   *     distribution.                                                          *
+   *                                                                            *
+   *  Agreed to on ______Feb. 15, 2017______________                            *
+   *                                                                            *
+   *  By: ____University of California, Berkeley___                             *
+   *      ____Chenming Hu__________________________                             *
+   *      ____Professor in Graduate School ________                             *
+   *                                                                            *
+   ****************************************************************************** */
 
 #include "ngspice/ngspice.h"
 #include "ngspice/smpdefs.h"
@@ -92,7 +128,7 @@ double vtfbphi2eot, phieot, TempRatioeot, Vtm0eot, Vtmeot,vbieot;
 int Size_Not_Found, i;
 
     /*  loop through all the BSIM4 device models */
-    for (; model != NULL; model = model->BSIM4nextModel)
+    for (; model != NULL; model = BSIM4nextModel(model))
     {    Temp = ckt->CKTtemp;
          if (model->BSIM4SbulkJctPotential < 0.1)
          {   model->BSIM4SbulkJctPotential = 0.1;
@@ -184,6 +220,13 @@ int Size_Not_Found, i;
          }
          if (!model->BSIM4cgboGiven)
              model->BSIM4cgbo = 2.0 * model->BSIM4dwc * model->BSIM4coxe;
+
+         struct bsim4SizeDependParam *p = model->pSizeDependParamKnot;
+         while (p) {
+             struct bsim4SizeDependParam *next_p = p->pNext;
+             FREE(p);
+             p = next_p;
+         }
          model->pSizeDependParamKnot = NULL;
          pLastKnot = NULL;
 
@@ -406,8 +449,8 @@ int Size_Not_Found, i;
 
 
          /* loop through all the instances of the model */
-         for (here = model->BSIM4instances; here != NULL;
-              here = here->BSIM4nextInstance)
+         for (here = BSIM4instances(model); here != NULL;
+              here = BSIM4nextInstance(here))
          {
               pSizeDependParamKnot = model->pSizeDependParamKnot;
               Size_Not_Found = 1;
@@ -465,56 +508,46 @@ int Size_Not_Found, i;
 
                   pParam->BSIM4leff = Lnew - 2.0 * pParam->BSIM4dl;
                   if (pParam->BSIM4leff <= 0.0)
-                  {   IFuid namarray[2];
-                      namarray[0] = model->BSIM4modName;
-                      namarray[1] = here->BSIM4name;
-                      (*(SPfrontEnd->IFerror))(ERR_FATAL,
+                  {
+                      SPfrontEnd->IFerrorf(ERR_FATAL,
                       "BSIM4: mosfet %s, model %s: Effective channel length <= 0",
-                       namarray);
+                       model->BSIM4modName, here->BSIM4name);
                       return(E_BADPARM);
                   }
 
                   pParam->BSIM4weff = Wnew - 2.0 * pParam->BSIM4dw;
                   if (pParam->BSIM4weff <= 0.0)
-                  {   IFuid namarray[2];
-                      namarray[0] = model->BSIM4modName;
-                      namarray[1] = here->BSIM4name;
-                      (*(SPfrontEnd->IFerror))(ERR_FATAL,
+                  {
+                      SPfrontEnd->IFerrorf(ERR_FATAL,
                       "BSIM4: mosfet %s, model %s: Effective channel width <= 0",
-                       namarray);
+                       model->BSIM4modName, here->BSIM4name);
                       return(E_BADPARM);
                   }
 
                   pParam->BSIM4leffCV = Lnew - 2.0 * pParam->BSIM4dlc;
                   if (pParam->BSIM4leffCV <= 0.0)
-                  {   IFuid namarray[2];
-                      namarray[0] = model->BSIM4modName;
-                      namarray[1] = here->BSIM4name;
-                      (*(SPfrontEnd->IFerror))(ERR_FATAL,
+                  {
+                      SPfrontEnd->IFerrorf(ERR_FATAL,
                       "BSIM4: mosfet %s, model %s: Effective channel length for C-V <= 0",
-                       namarray);
+                       model->BSIM4modName, here->BSIM4name);
                       return(E_BADPARM);
                   }
 
                   pParam->BSIM4weffCV = Wnew - 2.0 * pParam->BSIM4dwc;
                   if (pParam->BSIM4weffCV <= 0.0)
-                  {   IFuid namarray[2];
-                      namarray[0] = model->BSIM4modName;
-                      namarray[1] = here->BSIM4name;
-                      (*(SPfrontEnd->IFerror))(ERR_FATAL,
+                  {
+                      SPfrontEnd->IFerrorf(ERR_FATAL,
                       "BSIM4: mosfet %s, model %s: Effective channel width for C-V <= 0",
-                       namarray);
+                       model->BSIM4modName, here->BSIM4name);
                       return(E_BADPARM);
                   }
 
                   pParam->BSIM4weffCJ = Wnew - 2.0 * pParam->BSIM4dwj;
                   if (pParam->BSIM4weffCJ <= 0.0)
-                  {   IFuid namarray[2];
-                      namarray[0] = model->BSIM4modName;
-                      namarray[1] = here->BSIM4name;
-                      (*(SPfrontEnd->IFerror))(ERR_FATAL,
+                  {
+                      SPfrontEnd->IFerrorf(ERR_FATAL,
                       "BSIM4: mosfet %s, model %s: Effective channel width for S/D junctions <= 0",
-                       namarray);
+                       model->BSIM4modName, here->BSIM4name);
                       return(E_BADPARM);
                   }
 
@@ -861,6 +894,10 @@ int Size_Not_Found, i;
                                     + model->BSIM4lteta0 * Inv_L
                                     + model->BSIM4wteta0 * Inv_W
                                     + model->BSIM4pteta0 * Inv_LW;
+                  pParam->BSIM4tvoffcv = model->BSIM4tvoffcv /* v4.8.0  */
+                                    + model->BSIM4ltvoffcv * Inv_L
+                                    + model->BSIM4wtvoffcv * Inv_W
+                                    + model->BSIM4ptvoffcv * Inv_LW;
                   pParam->BSIM4etab = model->BSIM4etab
                                     + model->BSIM4letab * Inv_L
                                     + model->BSIM4wetab * Inv_W
@@ -993,6 +1030,18 @@ int Size_Not_Found, i;
                                      + model->BSIM4lcigc * Inv_L
                                      + model->BSIM4wcigc * Inv_W
                                      + model->BSIM4pcigc * Inv_LW;
+                  pParam->BSIM4aigsd = model->BSIM4aigsd
+                                     + model->BSIM4laigsd * Inv_L
+                                     + model->BSIM4waigsd * Inv_W
+                                     + model->BSIM4paigsd * Inv_LW;
+                  pParam->BSIM4bigsd = model->BSIM4bigsd
+                                     + model->BSIM4lbigsd * Inv_L
+                                     + model->BSIM4wbigsd * Inv_W
+                                     + model->BSIM4pbigsd * Inv_LW;
+                  pParam->BSIM4cigsd = model->BSIM4cigsd
+                                     + model->BSIM4lcigsd * Inv_L
+                                     + model->BSIM4wcigsd * Inv_W
+                                     + model->BSIM4pcigsd * Inv_LW;
                   pParam->BSIM4aigs = model->BSIM4aigs
                                      + model->BSIM4laigs * Inv_L
                                      + model->BSIM4waigs * Inv_W
@@ -1342,10 +1391,32 @@ int Size_Not_Found, i;
                                             / pParam->BSIM4poxedge / pParam->BSIM4poxedge;
                   pParam->BSIM4Aechvb = (model->BSIM4type == NMOS) ? 4.97232e-7 : 3.42537e-7;
                   pParam->BSIM4Bechvb = (model->BSIM4type == NMOS) ? 7.45669e11 : 1.16645e12;
-                  pParam->BSIM4AechvbEdgeS = pParam->BSIM4Aechvb * pParam->BSIM4weff
-                                          * model->BSIM4dlcig * pParam->BSIM4ToxRatioEdge;
-                  pParam->BSIM4AechvbEdgeD = pParam->BSIM4Aechvb * pParam->BSIM4weff
-                                          * model->BSIM4dlcigd * pParam->BSIM4ToxRatioEdge;
+
+                  if ((strcmp(model->BSIM4version, "4.8.1")) && (strncmp(model->BSIM4version, "4.81", 4)))
+                  {
+                      pParam->BSIM4AechvbEdgeS = pParam->BSIM4Aechvb * pParam->BSIM4weff
+                                              * model->BSIM4dlcig * pParam->BSIM4ToxRatioEdge;
+                      pParam->BSIM4AechvbEdgeD = pParam->BSIM4Aechvb * pParam->BSIM4weff
+                                              * model->BSIM4dlcigd * pParam->BSIM4ToxRatioEdge;
+                  }
+                  else
+                  {
+                      if (model->BSIM4dlcig < 0.0)
+                      {
+                          printf("Warning: dlcig = %g is negative. Set to zero.\n", model->BSIM4dlcig);
+                          model->BSIM4dlcig = 0.0;
+                      }
+                      pParam->BSIM4AechvbEdgeS = pParam->BSIM4Aechvb * pParam->BSIM4weff
+                          * model->BSIM4dlcig * pParam->BSIM4ToxRatioEdge;
+                      if (model->BSIM4dlcigd < 0.0)
+                      {
+                          printf("Warning: dlcigd = %g is negative. Set to zero.\n", model->BSIM4dlcigd);
+                          model->BSIM4dlcigd = 0.0;
+                      }
+                      pParam->BSIM4AechvbEdgeD = pParam->BSIM4Aechvb * pParam->BSIM4weff
+                          * model->BSIM4dlcigd * pParam->BSIM4ToxRatioEdge;
+                  }
+
                   pParam->BSIM4BechvbEdge = -pParam->BSIM4Bechvb
                                           * toxe * pParam->BSIM4poxedge;
                   pParam->BSIM4Aechvb *= pParam->BSIM4weff * pParam->BSIM4leff
@@ -1552,6 +1623,57 @@ int Size_Not_Found, i;
                   pParam->BSIM4inv_od_ref = Inv_saref + Inv_sbref;
                   pParam->BSIM4rho_ref = model->BSIM4ku0 / pParam->BSIM4ku0temp * pParam->BSIM4inv_od_ref;
 
+                  /*high k*/
+                  /*Calculate VgsteffVth for mobMod=3*/
+                  if(model->BSIM4mobMod==3)
+                  {        /*Calculate n @ Vbs=Vds=0*/
+                      lt1 = model->BSIM4factor1* pParam->BSIM4sqrtXdep0;
+                      T0 = pParam->BSIM4dvt1 * pParam->BSIM4leff / lt1;
+                      if (T0 < EXP_THRESHOLD)
+                      {
+                          T1 = exp(T0);
+                          T2 = T1 - 1.0;
+                          T3 = T2 * T2;
+                          T4 = T3 + 2.0 * T1 * MIN_EXP;
+                          Theta0 = T1 / T4;
+                      }
+                      else
+                          Theta0 = 1.0 / (MAX_EXP - 2.0);
+
+                      tmp1 = epssub / pParam->BSIM4Xdep0;
+                      tmp2 = pParam->BSIM4nfactor * tmp1;
+                      tmp3 = (tmp2 + pParam->BSIM4cdsc * Theta0 + pParam->BSIM4cit) / model->BSIM4coxe;
+                      if (tmp3 >= -0.5)
+                          n0 = 1.0 + tmp3;
+                      else
+                      {
+                          T0 = 1.0 / (3.0 + 8.0 * tmp3);
+                          n0 = (1.0 + 3.0 * tmp3) * T0;
+                      }
+
+                      T0 = n0 * model->BSIM4vtm;
+                      T1 = pParam->BSIM4voffcbn;
+                      T2 = T1/T0;
+                      if (T2 < -EXP_THRESHOLD)
+                      {   T3 = model->BSIM4coxe * MIN_EXP / pParam->BSIM4cdep0;
+                          T4 = pParam->BSIM4mstar + T3 * n0;
+                      }
+                      else if (T2 > EXP_THRESHOLD)
+                      {   T3 = model->BSIM4coxe * MAX_EXP / pParam->BSIM4cdep0;
+                          T4 = pParam->BSIM4mstar + T3 * n0;
+                      }
+                      else
+                      {  T3 = exp(T2)* model->BSIM4coxe / pParam->BSIM4cdep0;
+                         T4 = pParam->BSIM4mstar + T3 * n0;
+                      }
+                      pParam->BSIM4VgsteffVth = T0 * log(2.0)/T4;
+                  }
+
+                  /* New DITS term added in 4.7 */
+                  T0 = -pParam->BSIM4dvtp3 * log(pParam->BSIM4leff);
+                  DEXP(T0, T1);
+                  pParam->BSIM4dvtp2factor = pParam->BSIM4dvtp5 + pParam->BSIM4dvtp2 * T1;
+
               } /* End of SizeNotFound */
 
               /*  stress effect */
@@ -1660,6 +1782,9 @@ int Size_Not_Found, i;
             here->BSIM4vth0 += here->BSIM4delvto;
             here->BSIM4vfb = pParam->BSIM4vfb + model->BSIM4type * here->BSIM4delvto;
 
+            /* low field mobility multiplier */
+            here->BSIM4u0temp = pParam->BSIM4u0temp * here->BSIM4mulu0;
+
             /* Instance variables calculation  */
             T3 = model->BSIM4type * here->BSIM4vth0
                - here->BSIM4vfb - pParam->BSIM4phi;
@@ -1709,37 +1834,60 @@ int Size_Not_Found, i;
 
               if(here->BSIM4rbodyMod == 2)
                 {
-                  if (bodymode == 5)
-                    {
-                      rbsbx =  exp( log(model->BSIM4rbsbx0) + model->BSIM4rbsdbxl * lnl +
-                                    model->BSIM4rbsdbxw * lnw + model->BSIM4rbsdbxnf * lnnf );
-                      rbsby =  exp( log(model->BSIM4rbsby0) + model->BSIM4rbsdbyl * lnl +
-                                    model->BSIM4rbsdbyw * lnw + model->BSIM4rbsdbynf * lnnf );
-                      here->BSIM4rbsb = rbsbx * rbsby / (rbsbx + rbsby);
+                    if (bodymode == 5)
+                      {
+                        /*rbsbx =  exp( log(model->BSIM4rbsbx0) + model->BSIM4rbsdbxl * lnl +
+                              model->BSIM4rbsdbxw * lnw + model->BSIM4rbsdbxnf * lnnf );
+                        rbsby =  exp( log(model->BSIM4rbsby0) + model->BSIM4rbsdbyl * lnl +
+                              model->BSIM4rbsdbyw * lnw + model->BSIM4rbsdbynf * lnnf );
+                               */
+                        rbsbx =  model->BSIM4rbsbx0 * exp( model->BSIM4rbsdbxl * lnl +
+                              model->BSIM4rbsdbxw * lnw + model->BSIM4rbsdbxnf * lnnf );
+                        rbsby =  model->BSIM4rbsby0 * exp( model->BSIM4rbsdbyl * lnl +
+                              model->BSIM4rbsdbyw * lnw + model->BSIM4rbsdbynf * lnnf );
+                        here->BSIM4rbsb = rbsbx * rbsby / (rbsbx + rbsby);
 
 
-                      rbdbx =  exp( log(model->BSIM4rbdbx0) + model->BSIM4rbsdbxl * lnl +
-                                    model->BSIM4rbsdbxw * lnw + model->BSIM4rbsdbxnf * lnnf );
-                      rbdby =  exp( log(model->BSIM4rbdby0) + model->BSIM4rbsdbyl * lnl +
-                                    model->BSIM4rbsdbyw * lnw + model->BSIM4rbsdbynf * lnnf );
-                      here->BSIM4rbdb = rbdbx * rbdby / (rbdbx + rbdby);
-                    }
+                        /*rbdbx =  exp( log(model->BSIM4rbdbx0) + model->BSIM4rbsdbxl * lnl +
+                              model->BSIM4rbsdbxw * lnw + model->BSIM4rbsdbxnf * lnnf );
+                        rbdby =  exp( log(model->BSIM4rbdby0) + model->BSIM4rbsdbyl * lnl +
+                              model->BSIM4rbsdbyw * lnw + model->BSIM4rbsdbynf * lnnf );
+                                */
 
-                  if ((bodymode == 3)|| (bodymode == 5))
-                    {
-                      here->BSIM4rbps = exp( log(model->BSIM4rbps0) + model->BSIM4rbpsl * lnl +
-                                             model->BSIM4rbpsw * lnw + model->BSIM4rbpsnf * lnnf );
-                      here->BSIM4rbpd = exp( log(model->BSIM4rbpd0) + model->BSIM4rbpdl * lnl +
-                                             model->BSIM4rbpdw * lnw + model->BSIM4rbpdnf * lnnf );
-                    }
+                        rbdbx =  model->BSIM4rbdbx0 * exp( model->BSIM4rbsdbxl * lnl +
+                              model->BSIM4rbsdbxw * lnw + model->BSIM4rbsdbxnf * lnnf );
+                        rbdby =  model->BSIM4rbdby0 * exp(  model->BSIM4rbsdbyl * lnl +
+                              model->BSIM4rbsdbyw * lnw + model->BSIM4rbsdbynf * lnnf );
 
-                  rbpbx =  exp( log(model->BSIM4rbpbx0) + model->BSIM4rbpbxl * lnl +
-                                model->BSIM4rbpbxw * lnw + model->BSIM4rbpbxnf * lnnf );
-                  rbpby =  exp( log(model->BSIM4rbpby0) + model->BSIM4rbpbyl * lnl +
-                                model->BSIM4rbpbyw * lnw + model->BSIM4rbpbynf * lnnf );
-                  here->BSIM4rbpb = rbpbx*rbpby/(rbpbx + rbpby);
-                }
+                        here->BSIM4rbdb = rbdbx * rbdby / (rbdbx + rbdby);
+                      }
 
+                    if ((bodymode == 3)|| (bodymode == 5))
+                      {
+                        /*here->BSIM4rbps = exp( log(model->BSIM4rbps0) + model->BSIM4rbpsl * lnl +
+                                   model->BSIM4rbpsw * lnw + model->BSIM4rbpsnf * lnnf );
+                        here->BSIM4rbpd = exp( log(model->BSIM4rbpd0) + model->BSIM4rbpdl * lnl +
+                                                 model->BSIM4rbpdw * lnw + model->BSIM4rbpdnf * lnnf );
+                               */
+                        here->BSIM4rbps = model->BSIM4rbps0 * exp( model->BSIM4rbpsl * lnl +
+                                   model->BSIM4rbpsw * lnw + model->BSIM4rbpsnf * lnnf );
+                        here->BSIM4rbpd = model->BSIM4rbpd0 * exp( model->BSIM4rbpdl * lnl +
+                                                 model->BSIM4rbpdw * lnw + model->BSIM4rbpdnf * lnnf );
+
+                      }
+
+                    /*rbpbx =  exp( log(model->BSIM4rbpbx0) + model->BSIM4rbpbxl * lnl +
+                              model->BSIM4rbpbxw * lnw + model->BSIM4rbpbxnf * lnnf );
+                    rbpby =  exp( log(model->BSIM4rbpby0) + model->BSIM4rbpbyl * lnl +
+                              model->BSIM4rbpbyw * lnw + model->BSIM4rbpbynf * lnnf );
+                            */
+                            rbpbx =  model->BSIM4rbpbx0 * exp(  model->BSIM4rbpbxl * lnl +
+                              model->BSIM4rbpbxw * lnw + model->BSIM4rbpbxnf * lnnf );
+                    rbpby =  model->BSIM4rbpby0 * exp(  model->BSIM4rbpbyl * lnl +
+                              model->BSIM4rbpbyw * lnw + model->BSIM4rbpbynf * lnnf );
+
+                    here->BSIM4rbpb = rbpbx*rbpby/(rbpbx + rbpby);
+                  }
 
               if ((here->BSIM4rbodyMod == 1 ) || ((here->BSIM4rbodyMod == 2 ) && (bodymode == 5)) )
               {   if (here->BSIM4rbdb < 1.0e-3)
@@ -2134,65 +2282,9 @@ int Size_Not_Found, i;
                 here->BSIM4SswgTempRevSatCur = T5 * T10 * T11 * model->BSIM4jtsswgs;
                 here->BSIM4DswgTempRevSatCur = T6 * T10 * T11 * model->BSIM4jtsswgd;
 
-                /*high k*/
-                /*Calculate VgsteffVth for mobMod=3*/
-                if(model->BSIM4mobMod==3)
-                {        /*Calculate n @ Vbs=Vds=0*/
-                    V0 = pParam->BSIM4vbi - pParam->BSIM4phi;
-                    lt1 = model->BSIM4factor1* pParam->BSIM4sqrtXdep0;
-                    ltw = lt1;
-                    T0 = pParam->BSIM4dvt1 * pParam->BSIM4leff / lt1;
-                    if (T0 < EXP_THRESHOLD)
-                      {
-                        T1 = exp(T0);
-                        T2 = T1 - 1.0;
-                        T3 = T2 * T2;
-                        T4 = T3 + 2.0 * T1 * MIN_EXP;
-                        Theta0 = T1 / T4;
-                      }
-                    else
-                      Theta0 = 1.0 / (MAX_EXP - 2.0);
-
-                     tmp1 = epssub / pParam->BSIM4Xdep0;
-                    here->BSIM4nstar = model->BSIM4vtm / Charge_q *
-                      (model->BSIM4coxe        + tmp1 + pParam->BSIM4cit);
-                    tmp2 = pParam->BSIM4nfactor * tmp1;
-                    tmp3 = (tmp2 + pParam->BSIM4cdsc * Theta0 + pParam->BSIM4cit) / model->BSIM4coxe;
-                    if (tmp3 >= -0.5)
-                      n0 = 1.0 + tmp3;
-                    else
-                      {
-                        T0 = 1.0 / (3.0 + 8.0 * tmp3);
-                        n0 = (1.0 + 3.0 * tmp3) * T0;
-                      }
-
-                  T0 = n0 * model->BSIM4vtm;
-                  T1 = pParam->BSIM4voffcbn;
-                  T2 = T1/T0;
-                  if (T2 < -EXP_THRESHOLD)
-                  {   T3 = model->BSIM4coxe * MIN_EXP / pParam->BSIM4cdep0;
-                      T4 = pParam->BSIM4mstar + T3 * n0;
-                  }
-                  else if (T2 > EXP_THRESHOLD)
-                  {   T3 = model->BSIM4coxe * MAX_EXP / pParam->BSIM4cdep0;
-                      T4 = pParam->BSIM4mstar + T3 * n0;
-                  }
-                  else
-                  {  T3 = exp(T2)* model->BSIM4coxe / pParam->BSIM4cdep0;
-                               T4 = pParam->BSIM4mstar + T3 * n0;
-                  }
-                  pParam->BSIM4VgsteffVth = T0 * log(2.0)/T4;
-
-                }
-
-                /* New DITS term added in 4.7 */
-                T0 = -pParam->BSIM4dvtp3 * log(pParam->BSIM4leff);
-                DEXP(T0, T1);
-                pParam->BSIM4dvtp2factor = pParam->BSIM4dvtp5 + pParam->BSIM4dvtp2 * T1;
-
                 if(model->BSIM4mtrlMod != 0 && model->BSIM4mtrlCompatMod == 0)
-                {
-                    /* Calculate TOXP from EOT */
+        {
+            /* Calculate TOXP from EOT */
                     /* Calculate Vgs_eff @ Vgs = VDD with Poly Depletion Effect */
                     Vtm0eot = KboQ * model->BSIM4tempeot;
                     Vtmeot  = Vtm0eot;
@@ -2261,8 +2353,6 @@ int Size_Not_Found, i;
 
                     /* Calculate n */
                     tmp1 = epssub / pParam->BSIM4Xdep0;
-                    here->BSIM4nstar = Vtmeot / Charge_q *
-                      (model->BSIM4coxe        + tmp1 + pParam->BSIM4cit);
                     tmp2 = pParam->BSIM4nfactor * tmp1;
                     tmp3 = (tmp2 + pParam->BSIM4cdsc * Theta0 + pParam->BSIM4cit) / model->BSIM4coxe;
                     if (tmp3 >= -0.5)
@@ -2272,6 +2362,7 @@ int Size_Not_Found, i;
                         T0 = 1.0 / (3.0 + 8.0 * tmp3);
                         n = (1.0 + 3.0 * tmp3) * T0;
                       }
+
 
                     /* Vth correction for Pocket implant */
                     if (pParam->BSIM4dvtp0 > 0.0)
@@ -2307,15 +2398,17 @@ int Size_Not_Found, i;
                         toxpf = toxe - epsrox/model->BSIM4epsrsub * Tcen;
                         niter++;
                       } while ((niter<=4)&&(ABS(toxpf-toxpi)>1e-12));
-                      model->BSIM4toxp = toxpf;
-                      model->BSIM4coxp = epsrox * EPS0 / model->BSIM4toxp;
-                      }
+                      here->BSIM4toxp = toxpf;
+                      here->BSIM4coxp = epsrox * EPS0 / here->BSIM4toxp;
+                } else {
+                    here->BSIM4toxp = model->BSIM4toxp;
+                    here->BSIM4coxp = model->BSIM4coxp;
+                }
 
               if (BSIM4checkModel(model, here, ckt))
-              {   IFuid namarray[2];
-                  namarray[0] = model->BSIM4modName;
-                  namarray[1] = here->BSIM4name;
-                  (*(SPfrontEnd->IFerror)) (ERR_FATAL, "Fatal error(s) detected during BSIM4.6.0 parameter checking for %s in model %s", namarray);
+              {
+                  SPfrontEnd->IFerrorf(ERR_FATAL,
+                      "detected during BSIM4.8.1 parameter checking for \n    model %s of device instance %s\n", model->BSIM4modName, here->BSIM4name);
                   return(E_BADPARM);
               }
          } /* End instance */

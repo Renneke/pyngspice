@@ -41,7 +41,7 @@ ft_graf(struct dvec *v, struct dvec *xs, bool nostart)
     if (nostart) {
         degree = currentgraph->degree;
     } else {
-        if (!cp_getvar("polydegree", CP_NUM, &degree))
+        if (!cp_getvar("polydegree", CP_NUM, &degree, 0))
             degree = 1;
         currentgraph->degree = degree;
     }
@@ -55,7 +55,7 @@ ft_graf(struct dvec *v, struct dvec *xs, bool nostart)
         return;
     }
 
-    if (!cp_getvar("gridsize", CP_NUM, &gridsize))
+    if (!cp_getvar("gridsize", CP_NUM, &gridsize, 0))
         gridsize = 0;
 
     if ((gridsize < 0) || (gridsize > 10000)) {
@@ -130,14 +130,19 @@ ft_graf(struct dvec *v, struct dvec *xs, bool nostart)
      * interpolation.
      */
     if ((degree == 1) && (gridsize == 0)) {
+        /* We have to take care of non-monotonic x-axis values.
+        If they occur, plotting is suppressed, except for mono is set
+        to FALSE by flag 'retraceplot' in command 'plot'.
+        Then everything is plotted. */
+        bool mono = (currentgraph->plottype != PLOT_RETLIN);
         dir = 0;
         for (i = 0, j = v->v_length; i < j; i++) {
             dx = isreal(xs) ? xs->v_realdata[i] :
                 realpart(xs->v_compdata[i]);
             dy = isreal(v) ? v->v_realdata[i] :
                 realpart(v->v_compdata[i]);
-            if ((i == 0 || (dir > 0 ? lx > dx : dir < 0 ? lx < dx : 0)) &&
-                xs->v_plot && xs->v_plot->pl_scale == xs)
+            if ((i == 0 || (dir > 0 ? lx > dx : (dir < 0 ? lx < dx : 0))) &&
+                (mono || (xs->v_plot && xs->v_plot->pl_scale == xs)))
             {
                 gr_point(v, dx, dy, lx, ly, 0);
             } else {
@@ -219,13 +224,13 @@ ft_graf(struct dvec *v, struct dvec *xs, bool nostart)
 
     /* Plot the first degree segments... */
     if (isreal(v))
-        bcopy(v->v_realdata, ydata, (size_t)(degree + 1) * sizeof(double));
+        memcpy(ydata, v->v_realdata, (size_t)(degree + 1) * sizeof(double));
     else
         for (i = 0; i <= degree; i++)
             ydata[i] = realpart(v->v_compdata[i]);
 
     if (isreal(xs))
-        bcopy(xs->v_realdata, xdata, (size_t)(degree + 1) * sizeof(double));
+        memcpy(xdata, xs->v_realdata, (size_t)(degree + 1) * sizeof(double));
     else
         for (i = 0; i <= degree; i++)
             xdata[i] = realpart(xs->v_compdata[i]);
@@ -324,7 +329,7 @@ plotinterval(struct dvec *v, double lo, double hi, register double *coeffs, int 
     /* This is a problem -- how do we know what granularity to use?  If
      * the guy cares about this he will use gridsize.
      */
-    if (!cp_getvar("polysteps", CP_NUM, &steps))
+    if (!cp_getvar("polysteps", CP_NUM, &steps, 0))
         steps = GRANULARITY;
 
     incr = (hi - lo) / (double) (steps + 1);

@@ -3,10 +3,10 @@
 
 FILE lcouple/cfunc.mod
 
-Copyright 1991
-Georgia Tech Research Corporation, Atlanta, Ga. 30332
-All Rights Reserved
+Public Domain
 
+Georgia Tech Research Corporation
+Atlanta, Georgia 30332
 PROJECT A-8503-405
                
 
@@ -135,7 +135,7 @@ void cm_lcouple(ARGS)  /* structure holding parms,
               output_mmf,   /* output driving amp-turns to core side.      */
 
                num_turns,   /* number of turns on inductor                 */
-           pout_pin_fake,   /* fake partial derivative of output
+         /*pout_pin_fake,*/ /* fake partial derivative of output
                                w.r.t. input (for use with integration */
                 *in_flux,   /* current input flux value from core side
                                   (represented as a current).              */

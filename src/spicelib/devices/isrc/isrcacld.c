@@ -17,22 +17,37 @@ ISRCacLoad(GENmodel *inModel, CKTcircuit *ckt)
     ISRCinstance *here;
     double m;
 
-    for( ; model != NULL; model = model->ISRCnextModel ) {
+    for( ; model != NULL; model = ISRCnextModel(model)) {
 
         /* loop through all the instances of the model */
-        for (here = model->ISRCinstances; here != NULL ;
-                here=here->ISRCnextInstance) {
+        for (here = ISRCinstances(model); here != NULL ;
+                here=ISRCnextInstance(here)) {
+
+            double acReal, acImag;
+
+            if (ckt->CKTmode & MODEACNOISE) {
+                if ((GENinstance *) here == ckt->noise_input) {
+                    acReal = 1.0;
+                    acImag = 0.0;
+                } else {
+                    acReal = 0.0;
+                    acImag = 0.0;
+                }
+            } else {
+                acReal = here->ISRCacReal;
+                acImag = here->ISRCacImag;
+            }
 
             m = here->ISRCmValue;
 
             *(ckt->CKTrhs + (here->ISRCposNode)) +=
-                m * here->ISRCacReal;
+                m * acReal;
             *(ckt->CKTrhs + (here->ISRCnegNode)) -=
-                m * here->ISRCacReal;
+                m * acReal;
             *(ckt->CKTirhs + (here->ISRCposNode)) +=
-                m * here->ISRCacImag;
+                m * acImag;
             *(ckt->CKTirhs + (here->ISRCnegNode)) -=
-                m * here->ISRCacImag;
+                m * acImag;
         }
     }
 

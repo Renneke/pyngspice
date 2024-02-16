@@ -4,15 +4,15 @@
 #
 # (Process this file with autoconf to produce a configure script.)
 #
-# This configure file has been updated to mostly follow the guidence in the
+# This configure file has been updated to mostly follow the guidance in the
 # GNU Autoconf manual for version 2.59
 
 
-# Initialisation
+# Initialization
 # ---------------
 
-# Initialisation of configure
-AC_INIT([ngspice], [26], [http://ngspice.sourceforge.net/bugrep.html])
+# Initialization of configure
+AC_INIT([ngspice], [34], [http://ngspice.sourceforge.net/bugrep.html])
 
 # Unique file in the source directory
 AC_CONFIG_SRCDIR([src/ngspice.c])
@@ -22,21 +22,29 @@ AC_CONFIG_SRCDIR([src/ngspice.c])
 # problem to the user.  (2.52 is a guess and might need some adjustment)
 AC_PREREQ([2.59])
 
-# Revison stamp the generated ./configure script
+# Revision stamp the generated ./configure script
 AC_REVISION([$Revision$])
 
 # Create a configuration header
 AC_CONFIG_HEADER([src/include/ngspice/config.h])
 
-# Initialise automake stuff
-AM_INIT_AUTOMAKE([-Wall -Werror nostdinc])
+# Initialize automake stuff
+AM_INIT_AUTOMAKE([-Wall -Werror nostdinc serial-tests])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+
+ext_CFLAGS="${CFLAGS+yes}"
+
+AC_PROG_CC
+AC_PROG_CXX
+AX_PROG_CC_FOR_BUILD
 
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 
 AC_SUBST([AM_CPPFLAGS], ['-I. -I$(srcdir) -I$(top_builddir)/src/include'])
 
 AC_CONFIG_MACRO_DIR([m4])
+
+
 
 # Package Options
 # ---------------
@@ -45,25 +53,64 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_ARG_ENABLE([python],
     [AS_HELP_STRING([--enable-python], [Enable xspice python support])])
 
+# --disable-debug: remove -g and -Wall  option to the compiler
+AC_ARG_ENABLE([debug],
+    [AS_HELP_STRING([--disable-debug], [Remove -g option for compilation (default is -g)])])
+
+ # --enable-oldapps: define OLDAPPS
+AC_ARG_ENABLE([oldapps],
+    [AS_HELP_STRING([--enable-oldapps], [Enable making old, outdated apps.])])
+
+# --enable-xspice: define XSPICE in the code. This is for xspice support
+AC_ARG_ENABLE([xspice],
+    [AS_HELP_STRING([--enable-xspice], [Enable XSPICE enhancements])])
+
+# --enable-cider: define CIDER in the code. This is for CIDER support
+AC_ARG_ENABLE([cider],
+    [AS_HELP_STRING([--enable-cider], [Enable CIDER enhancements])])
+
+# --enable-adms: define ADMS in the code. This is for the adms Verilog-A compiler support
+AC_ARG_ENABLE([adms],
+    [AS_HELP_STRING([--enable-adms], [Enable ADMS code models, (experimental)])])
+
+# --enable-pss: enable PSS Analysis
+AC_ARG_ENABLE([pss],
+    [AS_HELP_STRING([--enable-pss], [Enable PSS Analysis, (experimental)])])
+
+# --enable-relpath: Relative path for binary and data. Default is "no".
+# ngspice shared may want relative paths for spinit etc.
+AC_ARG_ENABLE([relpath],
+    [AS_HELP_STRING([--enable-relpath], [Enable relative paths for spinit etc. Default=no])])
+
+# --with-readline:  Includes GNU readline support into CLI.  Default is "no".
+AC_ARG_WITH([readline],
+    [AS_HELP_STRING([--with-readline[=yes/no]], [Enable GNU readline support for CLI. Default=no.])])
+
+# --with-editline:  Includes BSD Editline support into CLI.  Default is "no".
+AC_ARG_WITH([editline],
+    [AS_HELP_STRING([--with-editline[=yes/no]], [Enable BSD editline support for CLI. Default=no.])])
+
+# --with-tcl: define TCL_MODULE in the code. This is for tcl support
+AC_ARG_WITH([tcl],
+    [AS_HELP_STRING([--with-tcl=tcldir], [Compiles  the tcl module instead,  experimental, see README.tcl])])
+
+# --with-ngshared: define SHARED_MODULE in the code. This is for ngspice as shared library (or dll)
+AC_ARG_WITH([ngshared],
+    [AS_HELP_STRING([--with-ngshared], [Compiles ngspice as shared library (dll)])])
+
+# --disable-utf8: don't use utf-8 and tchar for string representation, UNICODE support disabled
+AC_ARG_ENABLE([utf8],
+    [AS_HELP_STRING([--disable-utf8], [Don't use utf-8 or tchar (default is UNICODE support with utf-8)])])
+
+# old options, not maintained, may even not work at all
+
 # --enable-ansi: try to force --ansi option to the compiler
 AC_ARG_ENABLE([ansi],
     [AS_HELP_STRING([--enable-ansi], [Force --ansi option for compilation])])
 
-# --disable-debug: remove -g and -Wall  option to the compiler
-AC_ARG_ENABLE([debug],
-    [AS_HELP_STRING([--disable-debug], [Add -g option for compilation (default)])])
-
 # --enable-gprof: add -pg option to the compiler (GCC)
 AC_ARG_ENABLE([gprof],
    [AS_HELP_STRING([--enable-gprof], [Produce gprof profiling data in 'gmon.out' (GCC only).])])
-
-# --enable-checker: add --with-checker-debug  option to the compiler
-AC_ARG_ENABLE([checker],
-    [AS_HELP_STRING([--enable-checkergcc], [Option for compilation with checkergcc])])
-
-# --enable-gc: Enable Boehm-Weiser Conservative Garbage Collector
-AC_ARG_ENABLE([checker],
-    [AS_HELP_STRING([--enable-gc], [Use Boehm-Weiser Conservative Garbage Collector. Disabled by default.])])
 
 # --enable-nobypass: define NOBYPASS for the code
 AC_ARG_ENABLE([nobypass],
@@ -137,22 +184,6 @@ AC_ARG_ENABLE([experimental],
 AC_ARG_ENABLE([expdevices],
     [AS_HELP_STRING([--enable-expdevices], [Enable experimental devices (they do not compile)])])
 
-# --enable-xspice: define XSPICE in the code. This is for xspice support
-AC_ARG_ENABLE([xspice],
-    [AS_HELP_STRING([--enable-xspice], [Enable XSpice enhancements, (experimental)])])
-
-# --enable-cider: define CIDER in the code. This is for CIDER support
-AC_ARG_ENABLE([cider],
-    [AS_HELP_STRING([--enable-cider], [Enable CIDER enhancements, (experimental)])])
-
-# --enable-adms: define ADMS in the code. This is for the adms Verilog-A compiler support
-AC_ARG_ENABLE([adms],
-    [AS_HELP_STRING([--enable-adms], [Enable ADMS code models, (experimental)])])
-
-# --enable-pss: enable PSS Analysis
-AC_ARG_ENABLE([pss],
-    [AS_HELP_STRING([--enable-pss], [Enable PSS Analysis, (experimental)])])
-
 # --enable-ndev: define NDEV in the code. An interface for external device i.e. numerical device
 AC_ARG_ENABLE([ndev],
     [AS_HELP_STRING([--enable-ndev], [Enable NDEV interface, (experimental)])])
@@ -161,30 +192,17 @@ AC_ARG_ENABLE([ndev],
 AC_ARG_ENABLE([cluster],
     [AS_HELP_STRING([--enable-cluster], [Enable cluster support, (experimental)])])
 
+# --enable-cmathtests: run the ancient tests in src/math/cmaths
+AC_ARG_ENABLE([cmathtests],
+    [AS_HELP_STRING([--enable-cmathtests], [Enable ancient tests in src/math/cmaths])])
+
 # --enable-help: try to force --ansi option to the compiler
 AC_ARG_ENABLE([help],
     [AS_HELP_STRING([--enable-help], [Force building nghelp (deprecated)])])
 
-# --enable-xgraph: Compile the xgraph plotting program. Default is "no".
-# Xgraph is a plotting package for X11 once very popular.
-AC_ARG_ENABLE([xgraph],
-    [AS_HELP_STRING([--enable-xgraph], [Enable xgraph compilation.])])
-
-# --with-readline:  Includes GNU readline support into CLI.  Default is "no".
-AC_ARG_WITH([readline],
-    [AS_HELP_STRING([--with-readline[=yes/no]], [Enable GNU readline support for CLI. Default=no.])])
-
-# --with-editline:  Includes BSD Editline support into CLI.  Default is "no".
-AC_ARG_WITH([editline],
-    [AS_HELP_STRING([--with-editline[=yes/no]], [Enable BSD editline support for CLI. Default=no.])])
-
-# --with-tcl: define TCL_MODULE in the code. This is for tcl support
-AC_ARG_WITH([tcl],
-    [AS_HELP_STRING([--with-tcl=tcldir], [Compiles  the tcl module instead,  experimental, see README.tcl])])
-
-# --with-ngshared: define SHARED_MODULE in the code. This is for ngspice as shared library (or dll)
-AC_ARG_WITH([ngshared],
-    [AS_HELP_STRING([--with-ngshared], [Compiles ngspice as shared library (dll)])])
+# --with-fftw3: Use fftw3 for Fourier transforms.  Default is "yes".
+AC_ARG_WITH([fftw3],
+    [AS_HELP_STRING([--with-fftw3[=yes/no]], [Use fftw3 for Fourier transforms. Default=yes.])])
 
 # readline and editline cannot both be enabled
 if test "x$with_editline" = xyes; then
@@ -195,35 +213,38 @@ fi
 
 
 # Enable maintainer commands only if requested
-AM_MAINTAINER_MODE
+AM_MAINTAINER_MODE([enable])
 
 
 # Compiler checks
 # ---------------
 
-ext_CFLAGS="$CFLAGS"
-
-AC_PROG_CC
-
 # Work on compiler options according to system:
 # Set default CFLAGS - only use -Wall if we have gcc
 
 # the above AC_PROG_CC may set CFLAGS to "-O2 -g"
-if test "x$enable_debug" = xno; then
-    if test "x$GCC" = xyes; then
+if test "x$ext_CFLAGS" != xyes; then
+
+    if test "x$enable_debug" = xno; then
         AC_MSG_WARN([Removing debugging option!])
-        CFLAGS="-O2 -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wnested-externs -Wold-style-definition -Wredundant-decls -Wconversion -s $ext_CFLAGS"
+        if test "x$GCC" = xyes; then
+            CFLAGS="-O2 -s"
+        else
+            CFLAGS="-O2"
+        fi
     else
-        AC_MSG_WARN([Removing debugging option!])
-        CFLAGS="-O2 $ext_CFLAGS"
+        AC_DEFINE([NGDEBUG], [1], [Compile with debug info])
+        if test "x$GCC" = xyes; then
+            CFLAGS="-g -O0"
+        else
+            CFLAGS="-g"
+        fi
     fi
-else
-    AC_DEFINE([NGDEBUG], [1], [Compile with debug info])
+
     if test "x$GCC" = xyes; then
-        CFLAGS="-g -O1 -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wnested-externs -Wold-style-definition -Wredundant-decls -Wconversion $ext_CFLAGS"
-    else
-        CFLAGS="-g $ext_CFLAGS"
+        CFLAGS="$CFLAGS -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wnested-externs -Wold-style-definition -Wredundant-decls -Wconversion -Wno-unused-but-set-variable"
     fi
+
 fi
 
 # the profiling option
@@ -244,12 +265,6 @@ if test "x$enable_gprof" = xyes; then
         AC_MSG_ERROR([We only support --enable-gprof with GCC right now.])
     fi
 fi
-
-# Not sure that this will work....
-if test "x$with_checkergcc" = xyes; then
-    CC="checkergcc"
-fi
-
 
 # Checks for ANSI-C header files.
 AC_HEADER_STDC
@@ -296,6 +311,35 @@ else
     dprefix=$prefix
 fi
 
+####
+### check for operating system at compile time
+case $host_os in
+	*mingw* | *msys* )
+		AC_DEFINE([OS_COMPILED], [1], [MINGW for MS Windows])
+		;;
+	*cygwin* )
+		AC_DEFINE([OS_COMPILED], [2], [Cygwin for MS Windows])
+		;;
+	*freebsd* )
+		AC_DEFINE([OS_COMPILED], [3], [FreeBSD])
+		;;
+	*openbsd* )
+		AC_DEFINE([OS_COMPILED], [4], [OpenBSD])
+		;;
+	*solaris* )
+		AC_DEFINE([OS_COMPILED], [5], [Solaris])
+		;;
+	*linux* )
+		AC_DEFINE([OS_COMPILED], [6], [Linux])
+		;;
+	*darwin* )
+		AC_DEFINE([OS_COMPILED], [7], [macOS])
+		;;
+	* )
+		AC_DEFINE([OS_COMPILED], [0], [Other Operating System])
+		;;
+esac
+
 ##########################################################################
 #
 # ngspice as shared library (ngspice.so or ngspice.dll)
@@ -306,20 +350,34 @@ if test "x$with_ngshared" != x  &&  test "x$with_ngshared" != xno ; then
     has_shared_module=true
     AC_DEFINE([SHARED_MODULE], [1], [shared ngspice module])
     case $host_os in
-        *mingw* )
+        *mingw* | *msys* )
             has_shwin=true
             has_no_help=true
-            AC_DEFINE([HAS_SHWIN], [1], [ngspice.dll Windows])
             ;;
         *cygwin* )
             has_shcyg=true
             AC_CHECK_LIB([pthread], [pthread_create])
             ;;
         *)
-            CFLAGS="$CFLAGS -fvisibility=hidden"
             AC_CHECK_LIB([pthread], [pthread_create])
             ;;
     esac
+    if test "x$enable_debug" = xno; then
+        case $host_os in
+        *solaris* )
+            if test "x$GCC" = xyes; then
+                CFLAGS="$CFLAGS -fvisibility=hidden"
+            else
+                CFLAGS="$CFLAGS -xldscope=hidden"
+            fi
+            ;;
+        *mingw* | *msys* | *cygwin* )
+            ;;
+        *)
+            CFLAGS="$CFLAGS -fvisibility=hidden"
+            ;;
+        esac
+    fi
 
     with_x=no
     with_windows=no
@@ -343,7 +401,7 @@ elif test "x$with_tcl" != x  &&  test "x$with_tcl" != xno ; then
     has_tcl_module=true
     AC_DEFINE([TCL_MODULE], [1], [Tcl Module])
     case $host_os in
-        *mingw* )
+        *mingw* | *msys* )
             has_tclwin=true
             has_no_help=true
             AC_DEFINE([HAS_TCLWIN], [1], [Tcl Windows])
@@ -455,6 +513,9 @@ EOF
     fi
     rm -f conftest.tcl
 
+    AC_SEARCH_LIBS([Blt_GetVector], [BLT BLT24 BLT25],,
+        [AC_MSG_ERROR([Couldnt find BLT library.])])
+
     AC_CHECK_LIB([pthread], [pthread_create])
 
     if test -n "$libdir" ; then
@@ -532,6 +593,45 @@ AC_ARG_WITH([wingui],
 AC_MSG_RESULT([$with_wingui])
 AM_CONDITIONAL([WINGUI], [test "x$with_wingui" = xyes])
 
+case $host_os in
+    *mingw* | *msys* )
+        has_win32=yes
+        if test "x$with_wingui" = xyes; then
+            has_winconsole=no
+        else
+            if test "x$with_ngshared" = xyes; then
+                has_winconsole=no
+            else
+                has_winconsole=yes
+            fi
+        fi
+        ;;
+    *cygwin* )
+        has_cyg=yes
+        ;;
+    *)
+        has_win32=no
+        has_cyg=no
+        ;;
+esac
+AM_CONDITIONAL([WINCONSOLE], [test "x$has_winconsole" = xyes])
+
+if test "x$has_winconsole" = xyes; then
+    AC_CHECK_PROGS([WINRES], [windres windres.exe], [no])
+    if test "x$WINRES" = xno; then
+        AC_MSG_WARN([If you want adding the icon you should install windres])
+    fi
+fi
+
+if test "x$with_wingui" = xyes; then
+    AC_CHECK_PROGS([WINRES], [windres windres.exe], [no])
+    if test "x$WINRES" = xno; then
+        AC_MSG_WARN([If you want adding the icon you should install windres])
+    fi
+fi
+
+AM_CONDITIONAL([WINRESOURCE], [test "x$WINRES" = xwindres])
+
 case $with_wingui in
     yes )
         AC_DEFINE([X_DISPLAY_MISSING])
@@ -564,9 +664,6 @@ AC_HEADER_STDBOOL
 AC_TYPE_SIZE_T
 
 # Checks for library functions.
-AC_FUNC_ALLOCA
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
 AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_SELECT_ARGTYPES
 AC_FUNC_SETVBUF_REVERSED
@@ -577,9 +674,9 @@ AC_FUNC_VPRINTF
 #  that is how it has been historically.  Using --enable-rpath will turn this on
 
 _use_rpath=no
-AC_MSG_CHECKING([if hardcoding of the X11 runtime library path is desired])
+AC_MSG_CHECKING([if hard-coding of the X11 runtime library path is desired])
 AC_ARG_ENABLE([rpath],
-    [AS_HELP_STRING([--enable-rpath], [Enable hardcoding the X11 runtime library path])],
+    [AS_HELP_STRING([--enable-rpath], [Enable hard-coding the X11 runtime library path])],
     [   if test "x$enable_rpath" = xno ; then
             AC_MSG_RESULT([no])
             _use_rpath=no
@@ -592,6 +689,7 @@ AC_ARG_ENABLE([rpath],
         _use_rpath=no
     ]
 )
+
 
 if test "x$_use_rpath" = xyes ; then
     # Try to figure out if we need -Rpath for finding X11 libs
@@ -628,18 +726,13 @@ fi
 # Checks for X libraries - if X11 wasn't found then don't make following
 # tests and compile without X11 support - otherwise, check if the following
 # libraries are present (error if they are not)
-# In CYGWIN library ordering has to be changed. Is this compatible to LINUX?
 # XShmAttach is a struct in CYGWIN, not a function
-# SJB: 13th march 2005
-# Library order is giving linker warnings on MacOSX
-# It's not clear to me which order is required for Cygwin (see comment above)
-# and neither can I find any authoritative answer for the correct link order
-# for MacOSX or Linux, but
-#            -lXaw -lXmu -lXt -lXext -lX11
-# seems to be the popular choice.
-# (The previous order was -lX11 -lXt -lXext -lXmu -lXaw)
+# Library order is
+#            -lXaw -lXmu -lXt -lXext -lX11 (-lXft -lfontconfig -lXrender -lfreetype)
+# Xft is optional, allows text rotation in plots
 
 if test "x$no_x" != xyes ; then
+    X_CFLAGS="$X_CFLAGS -I/usr/include/freetype2"
     AC_CHECK_LIB([Xaw], [main], [X_LIBS="$X_LIBS -lXaw"],
         [AC_MSG_ERROR([Couldn't find Xaw library])], [$X_LIBS $X_EXTRA_LIBS])
     AC_CHECK_LIB([Xmu], [main], [X_LIBS="$X_LIBS -lXmu"],
@@ -648,6 +741,21 @@ if test "x$no_x" != xyes ; then
     AC_CHECK_LIB([Xext], [XShmAttach], [X_LIBS="$X_LIBS -lXext"],
         [AC_MSG_ERROR([Couldn't find Xext library])], [$X_LIBS $X_EXTRA_LIBS])
     X_LIBS="$X_LIBS -lX11"
+	AC_CHECK_LIB([Xft], [main],
+        [AC_DEFINE([HAVE_LIBXFT], [1], [Have xft routines in libxft])]
+        X_LIBS="$X_LIBS -lXft -lfontconfig -lXrender -lfreetype"
+        has_xft=yes,
+        [has_xft=no], [$X_LIBS $X_EXTRA_LIBS])
+
+    if test "x$has_xft" = xyes ; then
+        AC_CHECK_LIB([fontconfig], [main], [],
+            [AC_MSG_ERROR([Couldn't find fontconfig library])], [$X_LIBS $X_EXTRA_LIBS])
+#        AC_CHECK_LIB([Xrender], [main], [],
+#            [AC_MSG_ERROR([Couldn't find Xrender library])], [$X_LIBS $X_EXTRA_LIBS])
+        AC_CHECK_LIB([freetype], [main], [],
+            [AC_MSG_ERROR([Couldn't find freetype library])], [$X_LIBS $X_EXTRA_LIBS])
+    fi
+
     has_no_x=false
 else
     AC_DEFINE([X_DISPLAY_MISSING])
@@ -666,6 +774,24 @@ esac
 
 AM_CONDITIONAL([NO_X], [test "x$has_no_x" = xtrue])
 AM_CONDITIONAL([NO_HELP], [test "x$has_no_help" = xtrue])
+
+# Additional libs of hicum group
+AC_CHECK_LIB(stdc++, main, XTRALIBS="$XTRALIBS -lstdc++",,)
+AC_SUBST(XTRALIBS, $XTRALIBS)
+
+LIBS="$LIBS $XTRALIBS"
+
+# enabling making of the old and outdated applications
+# ngsconvert ngproc2mod ngmultidec ngmakeidx nghelp
+if test "x$enable_oldapps" = xyes ; then
+    AC_MSG_RESULT([ngnutmeg ngsconvert ngproc2mod ngmultidec ngmakeidx nghelp are made.])
+else
+    AC_MSG_RESULT([ngnutmeg ngsconvert ngproc2mod ngmultidec ngmakeidx nghelp are not made.])
+    AC_MSG_RESULT([No internal help available.])
+    AC_DEFINE([NOINTHELP], [1], [Internal (old) help not available])
+fi
+AM_CONDITIONAL([OLDAPPS], [test "x$enable_oldapps" = xyes])
+
 
 # Check for a few typdefs:
 AC_TYPE_PID_T
@@ -709,7 +835,7 @@ AC_CHECK_FUNCS([isatty tcgetattr tcsetattr])
 
 # Check for a few functions:
 AC_FUNC_FORK([])
-AC_CHECK_FUNCS([access bcopy bzero qsort dup2 popen])
+AC_CHECK_FUNCS([access qsort dup2 popen tsearch tdestroy])
 AC_CHECK_FUNCS([strchr index], [break])
 AC_CHECK_FUNCS([strrchr rindex], [break])
 AC_CHECK_FUNCS([getcwd getwd], [break])
@@ -719,10 +845,12 @@ AC_MSG_RESULT([Checking mathematical features of the system:])
 # Look for math library:
 AC_CHECK_LIB([m], [sqrt])
 AC_CHECK_HEADERS([float.h limits.h values.h ieeefp.h])
-AC_CHECK_HEADERS([fftw3.h])
-AC_CHECK_LIB([fftw3], [fftw_plan_dft_1d],
+if test "x$with_fftw3" != xno; then
+    AC_CHECK_HEADERS([fftw3.h])
+    AC_CHECK_LIB([fftw3], [fftw_plan_dft_1d],
         [AC_DEFINE([HAVE_LIBFFTW3], [], [Have fft routines in libfftw3])
          LIBS="$LIBS -lfftw3"])
+fi
 
 # Check for a few mathematical functions:
 AC_CHECK_FUNCS([erfc logb scalb scalbn asinh acosh atanh finite])
@@ -755,31 +883,9 @@ AC_TRY_LINK([#include <setjmp.h>],[jmp_buf env; sigsetjmp(env, 1);],
         AC_DEFINE([HAVE_SIGSETJMP], [], [Define if we have sigsetjmp().])],
     [AC_MSG_RESULT([no])])
 
-# A mingw ngspice dll with linking against libiberty.a seems not to be possible.
-# Because there is a internal replacement for asprintf, and dirmane is not been used anywhere,
-# just skip it.
-case $host_os in
-        *mingw* )
-            AC_MSG_RESULT([Cannot make dll from libiberty.a, no check for headers])
-            ;;
-        * )
-
-# Check for some headers (asprintf, dirname, etc.)
-AC_CHECK_HEADERS([libiberty.h libgen.h])
-
-# Check for the asprintf function:
-AC_CHECK_FUNCS([asprintf], [],
-    [AC_CHECK_LIB([iberty], [asprintf],
-        [AC_DEFINE([HAVE_ASPRINTF], [1], [Have asprintf in libiberty])
-         LIBS="$LIBS -liberty"])])
-
-            ;;
-esac
 
 # Check for the snprintf function:
-if test "x$ac_cv_func_asprintf" = xno ; then
-    AC_CHECK_FUNCS([snprintf])
-fi
+AC_CHECK_FUNCS([snprintf])
 
 # Check for the dirname function:
 AC_CHECK_FUNCS([dirname], [],
@@ -793,9 +899,34 @@ if test "x$getopt_long" = xtrue; then
     AC_DEFINE([HAVE_GETOPT_LONG], [1], [Have fcn getopt_long()])
 fi
 
+AM_CONDITIONAL([RELPATH], [test "x$enable_relpath" = xyes])
+if test "x$enable_relpath" = xyes; then
+    AC_DEFINE_UNQUOTED([NGSPICEBINDIR], ["`echo ../bin`"], [Define the directory for executables])
+    AC_DEFINE_UNQUOTED([NGSPICEDATADIR], ["`echo ../share/ngspice`"], [Define the directory for architecture independent data files])
+    AC_DEFINE([HAS_RELPATH], [1], [rel. path of libraries and scripts])
+else
 AC_DEFINE_UNQUOTED([NGSPICEBINDIR], ["`echo $dprefix/bin`"], [Define the directory for executables])
 AC_DEFINE_UNQUOTED([NGSPICEDATADIR], ["`echo $dprefix/share/ngspice`"], [Define the directory for architecture independent data files])
-AC_DEFINE_UNQUOTED([NGSPICEBUILDDATE], ["`date`"], [Define the build date])
+fi
+
+# Create timestamp, may be overruled by setting env var SOURCE_DATE_EPOCH
+case $host_os in
+    *freebsd* )
+        DATE_FMT="%Y-%m-%d"
+        SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(date +%s)}"
+        BUILD_DATE=$(date -u -d "@$SOURCE_DATE_EPOCH" "+$DATE_FMT" 2>/dev/null || date -u -r "$SOURCE_DATE_EPOCH" "+$DATE_FMT" 2>/dev/null || date -u "+$DATE_FMT")
+        ;;
+    *openbsd* )
+        DATE_FMT="%Y-%m-%d"
+        SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(date +%s)}"
+        BUILD_DATE=$(date -u -d "@$SOURCE_DATE_EPOCH" "+$DATE_FMT" 2>/dev/null || date -u -r "$SOURCE_DATE_EPOCH" "+$DATE_FMT" 2>/dev/null || date -u "+$DATE_FMT")
+        ;;
+    * )
+        BUILD_DATE="$(date --utc --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}")"
+        ;;
+esac
+
+AC_DEFINE_UNQUOTED([NGSPICEBUILDDATE], ["$BUILD_DATE"], [Define the build date])
 
 if test "x$with_wingui" = xyes; then
     AC_MSG_RESULT([WINDOWS GUI code enabled])
@@ -805,11 +936,6 @@ fi
 # Recapitulate settings:
 AC_MSG_RESULT([Settings which were chosen:])
 
-if test "x$enable_sense2" = xyes; then
-    AC_DEFINE([WANT_SENSE2], [], [Define if we want spice2 sensitivity analysis])
-    AC_MSG_RESULT([Spice2 sensitivity analysis enabled])
-    AC_MSG_WARN([This feature is UNSUPPORTED])
-fi
 if test "x$enable_nobypass" = xyes; then
     AC_DEFINE([NOBYPASS], [], [Define if we want NOBYPASS])
     AC_MSG_RESULT([NOBYPASS option enabled])
@@ -847,7 +973,7 @@ if test "x$enable_ftedebug" = xyes; then
     AC_MSG_RESULT([WARNING: Frontend debug is enabled])
 fi
 if test "x$enable_sensdebug" = xyes; then
-    AC_DEFINE([SENSDEBUG], [], [Define if we want debug sensititvity analysis])
+    AC_DEFINE([SENSDEBUG], [], [Define if we want debug sensitivity analysis])
     AC_MSG_RESULT([WARNING: Sensitivity code debug *SENSDEBUG* is enabled])
 fi
 if test "x$enable_asdebug" = xyes; then
@@ -874,20 +1000,19 @@ if test "x$enable_smltmsdebug" = xyes; then
     AC_DEFINE([D_DBG_SMALLTIMES], [], [Define if we want debug distortion analysis (SMALLTIMES)])
     AC_MSG_RESULT([WARNING: Distortion analysis debug *D_DBG_SMALLTIMES* is enabled])
 fi
-if test "x$enable_xgraph" = xyes; then
-    AC_MSG_RESULT([Xgraph compilation enabled.])
-    AC_CONFIG_SUBDIRS([xgraph])
-    XGRAPHDIR="xgraph"
-    NOTXGRAPH=""
-else
-    XGRAPHDIR=""
-    NOTXGRAPH="xgraph"
+if test "x$enable_utf8" = xno; then
+    AC_DEFINE([EXT_ASC], [], [Define if you want to disable UNICODE support])
+    AC_MSG_RESULT([WARNING: UNICOPDE support is disabled, extended ascii is enabled instead])
 fi
 
-AC_SUBST([XGRAPHDIR])
-AC_SUBST([NOTXGRAPH])
+AC_PROG_YACC
+AC_PATH_PROG([BISON], [bison])
+AX_PROG_BISON_VERSION([2.7], [],
+    [AC_DEFINE([OLD_BISON], [], [Bison is older than 2.7]),
+     AC_MSG_WARN([Bison is older than 2.7])])
+AC_PROG_LEX
 
-AC_CHECK_PROGS([YACC], ['bison -y' byacc yacc])
+AM_CONDITIONAL([CMATHTESTS], [test "x$enable_cmathtests" = xyes])
 
 #################  XSPICE ##################################################
 # Add new code models to the build by pointing to them here.
@@ -899,18 +1024,11 @@ if test "x$enable_python" = xyes; then
 fi
 
 if test "x$enable_xspice" = xyes; then
-    if test -z "${YACC}" ; then
-        AC_MSG_ERROR([XSPICE build requires bison, byacc or yacc parser generator])
-    fi
+    VIS_CFLAGS=""
     AC_MSG_RESULT([X-Spice features included])
     AC_DEFINE([XSPICE], [1], [The xspice enhancements])
-# Define variables for LEX
-    AC_CHECK_PROGS([LEX], [flex lex])
-    if test -z "$LEX" ; then
-        AC_MSG_ERROR([Flex is required for building XSPICE])
-    fi
     case $host_os in
-        *mingw* )
+        *mingw* | *msys* )
             AC_DEFINE([IPC_DEBUG_VIA_STDIO], [1], [Client-Server only via stdio.])
             XSPICEDLLIBS=""
             ;;
@@ -920,26 +1038,41 @@ if test "x$enable_xspice" = xyes; then
             ;;
         *freebsd* )
             AC_DEFINE([IPC_UNIX_SOCKETS], [1], [Client-Server via socket.])
-            XSPICEDLLIBS=""
+            XSPICEDLLIBS="-ldl"
             ;;
         *openbsd* )
             AC_DEFINE([IPC_UNIX_SOCKETS], [1], [Client-Server via socket.])
+            XSPICEDLLIBS="-ldl"
+            ;;
+        *solaris* )
+            AC_DEFINE([IPC_UNIX_SOCKETS], [1], [Client-Server via socket.])
             XSPICEDLLIBS=""
+            if test "x$with_ngshared" != xyes ; then
+                if test "x$enable_debug" = xno; then
+                    if test "x$GCC" = xyes; then
+                        VIS_CFLAGS="-fvisibility=hidden"
+                    else
+                        VIS_CFLAGS="-xldscope=hidden"
+                    fi
+                fi
+            fi
             ;;
         * )
             AC_DEFINE([IPC_UNIX_SOCKETS], [1], [Client-Server via socket.])
             XSPICEDLLIBS="-ldl"
+            if test "x$with_ngshared" != xyes ; then
+                if test "x$enable_debug" = xno; then
+                    VIS_CFLAGS="-fvisibility=hidden"
+                fi
+            fi
             ;;
     esac
     XSPICEINIT=""
     AC_CHECK_FUNCS([modf])
     AC_CHECK_HEADERS([libintl.h malloc.h])
+    AC_SUBST([VIS_CFLAGS])
 else
     XSPICEINIT="*"
-
-    if test -z "${YACC}" ; then
-        AC_MSG_WARN([No bison, byacc, yacc found: Uses prebuilt default parsers])
-    fi
 fi
 AC_SUBST([XSPICEINIT])
 AC_SUBST([XSPICEDLLIBS])
@@ -966,42 +1099,50 @@ if test "x$enable_adms" = xyes ; then
     AC_MSG_RESULT([**********************************
 * ADMS  support is  experimental *
 **********************************])
-    AC_CHECK_PROGS([ADMSXML], [admsXml admsXml.exe], [no])
+    AC_CHECK_PROGS([ADMSXML], [admsXml admsXml.exe])
 
-    if test "x$ADMSXML" = xno; then
+    if test "x$ADMSXML" = x; then
         AC_MSG_ERROR([If you want Verilog-A models you should install admsXml])
     fi
     AC_DEFINE([ADMS], [1], [Support for Verilog-A models])
 
-    VLADEVDIR=" adms/ekv \
+    VLADEVDIR=" adms/bsimbulk \
+                adms/bsimcmg \
+                adms/ekv \
                 adms/hicum0 \
-                adms/hicum2 \
                 adms/mextram \
-                adms/psp102 "
+                adms/psp102 \
+                adms/psp103 \
+                adms/r2_cmc "
 
 # The makefiles for adms (to be added to AC_CONFIG_FILES by ./autogen.sh --adms)
+#VLAMKF    src/spicelib/devices/adms/bsimbulk/Makefile
+#VLAMKF    src/spicelib/devices/adms/bsimcmg/Makefile
 #VLAMKF    src/spicelib/devices/adms/ekv/Makefile
 #VLAMKF    src/spicelib/devices/adms/hicum0/Makefile
-#VLAMKF    src/spicelib/devices/adms/hicum2/Makefile
 #VLAMKF    src/spicelib/devices/adms/mextram/Makefile
 #VLAMKF    src/spicelib/devices/adms/psp102/Makefile
+#VLAMKF    src/spicelib/devices/adms/psp103/Makefile
+#VLAMKF    src/spicelib/devices/adms/r2_cmc/Makefile
 
     NOTVLADEVDIR=""
 
-    VLADEV=" spicelib/devices/adms/ekv/libekv.la \
+    VLADEV=" spicelib/devices/adms/bsimbulk/libbsimbulk.la \
+             spicelib/devices/adms/bsimcmg/libbsimcmg.la \
+             spicelib/devices/adms/ekv/libekv.la \
              spicelib/devices/adms/hicum0/libhicum0.la \
-             spicelib/devices/adms/hicum2/libhicum2.la \
              spicelib/devices/adms/mextram/libbjt504t.la \
-             spicelib/devices/adms/psp102/libpsp102.la "
+             spicelib/devices/adms/psp102/libpsp102.la \
+             spicelib/devices/adms/psp103/libpsp103.la \
+             spicelib/devices/adms/r2_cmc/libr2_cmc.la "
 
 else
 
     VLADEVDIR=""
-    NOTVLADEVDIR="adms"
+    NOTVLADEVDIR="adms/admst"
 
 fi
 
-AC_SUBST([ADMSXML])
 AC_SUBST([VLADEVDIR])
 AC_SUBST([VLADEV])
 AC_SUBST([NOTVLADEVDIR])
@@ -1038,9 +1179,9 @@ else
         AC_CHECK_HEADERS([readline/readline.h readline/history.h],
             [AC_DEFINE([HAVE_GNUREADLINE], [], [Define if we have GNU readline])],
             [AC_MSG_ERROR([Couldn't find GNU readline headers.])])
-        AC_SEARCH_LIBS([tputs], [ncurses termcap],
-            [AC_DEFINE([HAVE_TERMCAP], [], [Define if we have ncurses or termcap])],
-            [AC_MSG_ERROR([Found neither ncurses or termcap])])
+        AC_SEARCH_LIBS([tputs], [ncurses tinfo termcap],
+            [AC_DEFINE([HAVE_TERMCAP], [], [Define if we have ncurses/terminfo or termcap])],
+            [AC_MSG_ERROR([Found neither ncurses/terminfo or termcap])])
         AC_CHECK_LIB([readline], [readline],
             [LIBS="$LIBS -lreadline"],
             [AC_MSG_ERROR([Couldn't find readline libraries.])])
@@ -1058,9 +1199,9 @@ else
     AC_CHECK_HEADERS([editline/readline.h],
         [AC_DEFINE([HAVE_BSDEDITLINE], [1], [Define to enable BSD editline])],
         [AC_MSG_ERROR([Couldn't find BSD editline headers.])])
-    AC_SEARCH_LIBS([tputs], [ncurses termcap],
-        [AC_DEFINE([HAVE_TERMCAP], [], [Define if we have ncurses or termcap])],
-        [AC_MSG_ERROR([Found neither ncurses or termcap])])
+    AC_SEARCH_LIBS([tputs], [ncurses tinfo termcap],
+        [AC_DEFINE([HAVE_TERMCAP], [], [Define if we have ncurses/terminfo or termcap])],
+        [AC_MSG_ERROR([Found neither ncurses/terminfo or termcap])])
     AC_CHECK_LIB([edit], [readline],
         [LIBS="$LIBS -ledit"],
         [AC_MSG_ERROR([Couldn't find editline libraries.])],
@@ -1090,6 +1231,7 @@ fi
 AC_CONFIG_FILES([Makefile
                  man/Makefile
                  man/man1/Makefile
+                 ngspice.pc
                  src/Makefile
                  src/spicelib/Makefile
                  src/spicelib/analysis/Makefile
@@ -1103,9 +1245,9 @@ AC_CONFIG_FILES([Makefile
                  src/spicelib/devices/bsim3v1/Makefile
                  src/spicelib/devices/bsim3v32/Makefile
                  src/spicelib/devices/bsim4/Makefile
-                 src/spicelib/devices/bsim4v4/Makefile
                  src/spicelib/devices/bsim4v5/Makefile
                  src/spicelib/devices/bsim4v6/Makefile
+                 src/spicelib/devices/bsim4v7/Makefile
                  src/spicelib/devices/bsim3soi_pd/Makefile
                  src/spicelib/devices/bsim3soi_fd/Makefile
                  src/spicelib/devices/bsim3soi_dd/Makefile
@@ -1120,8 +1262,10 @@ AC_CONFIG_FILES([Makefile
                  src/spicelib/devices/isrc/Makefile
                  src/spicelib/devices/hfet1/Makefile
                  src/spicelib/devices/hfet2/Makefile
+                 src/spicelib/devices/hicum2/Makefile
                  src/spicelib/devices/hisim2/Makefile
                  src/spicelib/devices/hisimhv1/Makefile
+                 src/spicelib/devices/hisimhv2/Makefile
                  src/spicelib/devices/jfet/Makefile
                  src/spicelib/devices/jfet2/Makefile
                  src/spicelib/devices/ltra/Makefile
@@ -1142,6 +1286,7 @@ AC_CONFIG_FILES([Makefile
                  src/spicelib/devices/vbic/Makefile
                  src/spicelib/devices/vccs/Makefile
                  src/spicelib/devices/vcvs/Makefile
+                 src/spicelib/devices/vdmos/Makefile
                  src/spicelib/devices/vsrc/Makefile
                  src/spicelib/devices/nbjt/Makefile
                  src/spicelib/devices/nbjt2/Makefile
@@ -1162,6 +1307,7 @@ AC_CONFIG_FILES([Makefile
                  src/frontend/trannoise/Makefile
                  src/frontend/wdisp/Makefile
                  src/include/ngspice/Makefile
+                 src/include/cppduals/duals/Makefile
                  src/maths/Makefile
                  src/maths/cmaths/Makefile
                  src/maths/fft/Makefile
@@ -1181,14 +1327,10 @@ AC_CONFIG_FILES([Makefile
                  src/xspice/enh/Makefile
                  src/xspice/ipc/Makefile
                  src/xspice/idn/Makefile
-                 src/unsupported/Makefile
                  tests/Makefile
                  tests/bsim1/Makefile
                  tests/bsim2/Makefile
                  tests/bsim3/Makefile
-                 tests/bsim3/ac_sim/Makefile
-                 tests/bsim3/dc_sim/Makefile
-                 tests/bsim3/tran_sim/Makefile
                  tests/bsim3soidd/Makefile
                  tests/bsim3soifd/Makefile
                  tests/bsim3soipd/Makefile
@@ -1197,8 +1339,10 @@ AC_CONFIG_FILES([Makefile
                  tests/filters/Makefile
                  tests/general/Makefile
                  tests/hfet/Makefile
+                 tests/hicum2/Makefile
                  tests/hisim/Makefile
                  tests/hisimhv1/Makefile
+                 tests/hisimhv2/Makefile
                  tests/jfet/Makefile
                  tests/mes/Makefile
                  tests/mesa/Makefile
@@ -1208,6 +1352,13 @@ AC_CONFIG_FILES([Makefile
                  tests/regression/subckt-processing/Makefile
                  tests/regression/lib-processing/Makefile
                  tests/regression/parser/Makefile
+                 tests/regression/func/Makefile
+                 tests/regression/model/Makefile
+                 tests/regression/misc/Makefile
+                 tests/regression/sens/Makefile
+                 tests/regression/temper/Makefile
+                 tests/regression/pipe/Makefile
+                 tests/regression/pz/Makefile
                  tests/sensitivity/Makefile
                  tests/transient/Makefile
                  tests/transmission/Makefile
@@ -1216,4 +1367,19 @@ AC_CONFIG_FILES([Makefile
                  tests/xspice/digital/spinit
                  tests/resistance/Makefile
                  tests/vbic/Makefile])
+
+AM_CONDITIONAL([CROSS_COMPILING], [test "x$cross_compiling" = xyes])
+
+if test "x$cross_compiling" = xyes; then
+   AC_CONFIG_COMMANDS([mkdir], [$MKDIR_P src/xspice/cmpp/build])
+   AC_SUBST([CMPP], ['$(top_builddir)/src/xspice/cmpp/build/cmpp$(BUILD_EXEEXT)'])
+else
+   AC_SUBST([CMPP], ['$(top_builddir)/src/xspice/cmpp/cmpp$(EXEEXT)'])
+fi
+
+# See https://github.com/kimwalisch/primesieve/issues/16
+# Silence warning: ar: 'u' modifier ignored since 'D' is the default
+AC_SUBST(AR_FLAGS, [cr])
+
+
 AC_OUTPUT

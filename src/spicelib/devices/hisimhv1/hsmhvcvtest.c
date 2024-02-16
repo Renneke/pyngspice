@@ -4,11 +4,11 @@
  Copyright (C) 2012 Hiroshima University & STARC
 
  MODEL NAME : HiSIM_HV 
- ( VERSION : 1  SUBVERSION : 2  REVISION : 3 )
+ ( VERSION : 1  SUBVERSION : 2  REVISION : 4 )
  Model Parameter VERSION : 1.23
  FILE : hsmhvcvtest.c
 
- DATE : 2012.4.6
+ DATE : 2013.04.30
 
  released by 
                 Hiroshima University &
@@ -48,10 +48,10 @@ int HSMHVconvTest(
 
 
   /*  loop through all the HSMHV device models */
-  for ( ; model != NULL; model = model->HSMHVnextModel ) {
+  for ( ; model != NULL; model = HSMHVnextModel(model)) {
     /* loop through all the instances of the model */
-    for ( here = model->HSMHVinstances; here != NULL ;
-	  here = here->HSMHVnextInstance ) {
+    for ( here = HSMHVinstances(model); here != NULL ;
+	  here = HSMHVnextInstance(here)) {
 
       vds = model->HSMHV_type * 
             (*(ckt->CKTrhsOld+here->HSMHVdNodePrime) -

@@ -3,10 +3,10 @@
 
 FILE d_state/cfunc.mod
 
-Copyright 1991
-Georgia Tech Research Corporation, Atlanta, Ga. 30332
-All Rights Reserved
+Public Domain
 
+Georgia Tech Research Corporation
+Atlanta, Georgia 30332
 PROJECT A-8503-405
                
 
@@ -216,7 +216,7 @@ static char  *CNVgettok(char **s)
 
     /* skip over any white space */
 
-    while(isspace(**s) || (**s == '=') ||
+    while(isspace_c(**s) || (**s == '=') ||
           (**s == '(') || (**s == ')') || (**s == ','))
           (*s)++;
 
@@ -234,7 +234,7 @@ static char  *CNVgettok(char **s)
                          /* or a mess o' characters.            */
         i = 0;
         while( (**s != '\0') &&
-               (! ( isspace(**s) || (**s == '=') || 
+               (! ( isspace_c(**s) || (**s == '=') || 
                     (**s == '(') || (**s == ')') || 
                     (**s == ',') 
              ) )  ) {
@@ -248,7 +248,7 @@ static char  *CNVgettok(char **s)
 
     /* skip over white space up to next token */
 
-    while(isspace(**s) || (**s == '=') ||
+    while(isspace_c(**s) || (**s == '=') ||
           (**s == '(') || (**s == ')') || (**s == ','))
           (*s)++;
 
@@ -422,9 +422,9 @@ double  *p_value )   /* OUT - The numerical value     */
 
     for(i = 0; i < len; i++) {
         c = str[i];
-        if( isalpha(c) && (c != 'E') && (c != 'e') )
+        if( isalpha_c(c) && (c != 'E') && (c != 'e') )
             break;
-        else if( isspace(c) )
+        else if( isspace_c(c) )
             break;
         else
             val_str[i] = c;
@@ -434,12 +434,12 @@ double  *p_value )   /* OUT - The numerical value     */
 
     /* Determine the scale factor */
 
-    if( (i >= len) || (! isalpha(c)) )
+    if( (i >= len) || (! isalpha_c(c)) )
         scale_factor = 1.0;
     else {
 
-        if(islower(c))
-            c = (char) tolower(c);
+        if(islower_c(c))
+            c = tolower_c(c);
 
         switch(c) {
 
@@ -478,12 +478,12 @@ double  *p_value )   /* OUT - The numerical value     */
                 break;
             }
             c1 = str[i];
-            if(! isalpha(c1)) {
+            if(! isalpha_c(c1)) {
                 scale_factor = 1.0e-3;
                 break;
             }
-            if(islower(c1))
-                c1 = (char) toupper(c1);
+            if(islower_c(c1))
+                c1 = toupper_c(c1);
             if(c1 == 'E')
                 scale_factor = 1.0e6;
             else if(c1 == 'I')
@@ -1389,7 +1389,7 @@ static int cm_read_state_file(FILE *state_file,State_Table_t *states)
                             /*base;*/   /* holding variable for existing 
                                        non-masked bits[] integer  */
 	if (!state_file) {
-		return 1;
+		return 2;
 	}                 
 
     i = 0;                                 
@@ -1398,7 +1398,7 @@ static int cm_read_state_file(FILE *state_file,State_Table_t *states)
         /* Test this string to see if it is whitespace... */
 
         base_address = s;
-        while(isspace(*s) || (*s == '*')) 
+        while(isspace_c(*s) || (*s == '*')) 
               (s)++;
         if ( *s != '\0' ) {     /* This is not a blank line, so process... */
             s = base_address;
@@ -1461,7 +1461,7 @@ static int cm_read_state_file(FILE *state_file,State_Table_t *states)
                             /* convert to a floating point number... */
                             cnv_get_spice_value(token,&number);
             
-                            states->state[i] = number;
+                            states->state[i] = (int) number;
 
                              
                         }
@@ -1530,7 +1530,7 @@ static int cm_read_state_file(FILE *state_file,State_Table_t *states)
                                         /* convert to a floating point number... */
                                         cnv_get_spice_value(token,&number);
             
-                                        states->next_state[i] = number;
+                                        states->next_state[i] = (int) number;
                                     }
                                 }
                             }
@@ -1657,7 +1657,7 @@ static int cm_read_state_file(FILE *state_file,State_Table_t *states)
                                 /* convert to a floating point number... */
                                 cnv_get_spice_value(token,&number);
                         
-                                states->next_state[i] = number;
+                                states->next_state[i] = (int) number;
                             }
                         }       
                     } 
@@ -1761,11 +1761,11 @@ void cm_d_state(ARGS)
                                        input from state.in */
                               *s;   /* main string variable */ 
 
-/*    char *open_error = "\n***ERROR***\nD_STATE: failed to open state file.\n";*/
+    char *open_error = "\nERROR\n  D_STATE: failed to open state file.\n";
 
-    char *loading_error = "\n***ERROR***\nD_STATE: state file was not read successfully. \nThe most common cause of this problem is a\ntrailing blank line in the state.in file \n";
+    char *loading_error = "\nERROR\n  D_STATE: state file was not read successfully. \n  The most common cause of this problem is a\n  trailing blank line in the state.in file \n";
 
-    char *index_error = "\n***ERROR***\nD_STATE: An error exists in the ordering of states values\n in the states->state[] array. This is usually caused \nby non-contiguous state definitions in the state.in file \n";
+    char *index_error = "\nERROR\n  D_STATE: An error exists in the ordering of states values\n  in the states->state[] array. This is usually caused \n  by non-contiguous state definitions in the state.in file \n";
 /*    char buf[100];*/
 
 
@@ -1786,7 +1786,7 @@ void cm_d_state(ARGS)
         if (state_file!=NULL)
             while ( fgets(s,MAX_STRING_SIZE,state_file) != NULL) {
                 if ( '*' != s[0] ) {
-                    while(isspace(*s) || (*s == '*')) 
+                    while(isspace_c(*s) || (*s == '*')) 
                         (s)++;
                     if ( *s != '\0' ) i++;
                 }
@@ -1845,13 +1845,15 @@ void cm_d_state(ARGS)
             rewind(state_file);
             err = cm_read_state_file(state_file,states);
         } else {
-            err = 1;
+            err = 2;
         }
 
-        if (err) { /* problem occurred in load...send error msg. */
-
+        if (err == 1) /* problem occurred in load...send error msg. */
             cm_message_send(loading_error);
+        else if (err == 2)  /* problem opening the state file...send error msg. */   
+            cm_message_send(open_error);
 
+        if (err > 0) {
             /* Reset arrays to zero */
             for (i=0; i<states->depth; i++) {
                 states->state[i] = 0;
@@ -1877,7 +1879,9 @@ void cm_d_state(ARGS)
 
         LOAD(clk) = PARAM(clk_load);
 
-        LOAD(reset) = PARAM(reset_load);
+        if ( !PORT_NULL(reset) ) {
+            LOAD(reset) = PARAM(reset_load);
+        }
 
     }
     else {  /**** Retrieve previous values ****/

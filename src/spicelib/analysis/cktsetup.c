@@ -15,6 +15,10 @@ Author: 1985 Thomas L. Quarles
 #include "ngspice/devdefs.h"
 #include "ngspice/sperror.h"
 
+#ifdef XSPICE
+#include "ngspice/enh.h"
+#endif
+
 #ifdef USE_OMP
 #include <omp.h>
 #include "ngspice/cpextern.h"
@@ -59,7 +63,7 @@ CKTsetup(CKTcircuit *ckt)
     matrix = ckt->CKTmatrix;
 
 #ifdef USE_OMP
-    if (!cp_getvar("num_threads", CP_NUM, &nthreads))
+    if (!cp_getvar("num_threads", CP_NUM, &nthreads, 0))
         nthreads = 2;
 
     omp_set_num_threads(nthreads);
@@ -69,10 +73,18 @@ CKTsetup(CKTcircuit *ckt)
       printf("OpenMP: %d threads are requested in ngspice\n", nthreads);*/
 #endif
 
-    for (i=0;i<DEVmaxnum;i++) {
 #ifdef HAS_PROGREP
-        SetAnalyse( "Device Setup", 0 );
+    SetAnalyse("Device Setup", 0);
 #endif
+
+    /* preserve CKTlastNode before invoking DEVsetup()
+     * so we can check for incomplete CKTdltNNum() invocations
+     * during DEVunsetup() causing an erronous circuit matrix
+     *   when reinvoking CKTsetup()
+     */
+    ckt->prev_CKTlastNode = ckt->CKTlastNode;
+
+    for (i=0;i<DEVmaxnum;i++) {
         if ( DEVices[i] && DEVices[i]->DEVsetup && ckt->CKThead[i] ) {
             error = DEVices[i]->DEVsetup (matrix, ckt->CKThead[i], ckt,
                     &ckt->CKTnumStates);
@@ -147,7 +159,7 @@ CKTunsetup(CKTcircuit *ckt)
     /* added by HT 050802*/
     for(node=ckt->CKTnodes;node;node=node->next){
         if(node->icGiven || node->nsGiven) {
-            node->ptr=0;
+            node->ptr=NULL;
         }
     }
 
@@ -158,6 +170,13 @@ CKTunsetup(CKTcircuit *ckt)
                 error = e2;
         }
     }
+
+    if (ckt->prev_CKTlastNode != ckt->CKTlastNode) {
+        fprintf(stderr, "Internal Error: incomplete CKTunsetup(), this will cause serious problems, please report this issue !\n");
+        controlled_exit(EXIT_FAILURE);
+    }
+    ckt->prev_CKTlastNode = NULL;
+
     ckt->CKTisSetup = 0;
     if(error) return(error);
 

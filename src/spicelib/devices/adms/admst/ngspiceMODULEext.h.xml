@@ -44,14 +44,14 @@ extern int $(module)ask(CKTcircuit *,GENinstance*,int,IFvalue*,IFvalue*);
 extern int $(module)mAsk(CKTcircuit*,GENmodel *,int, IFvalue*);
 extern int $(module)acLoad(GENmodel *,CKTcircuit*);
 extern int $(module)convTest(GENmodel *,CKTcircuit*);
-extern int $(module)delete(GENmodel*,IFuid,GENinstance**);
+extern int $(module)delete(GENinstance*);
 extern int $(module)getic(GENmodel*,CKTcircuit*);
-extern int $(module)mDelete(GENmodel**,IFuid,GENmodel*);
+extern int $(module)mDelete(GENmodel*);
 extern int $(module)noise(int,int,GENmodel*,CKTcircuit*,Ndata*,double*);
 extern int $(module)pzLoad(GENmodel*,CKTcircuit*,SPcomplex*);
 extern int $(module)trunc(GENmodel*,CKTcircuit*,double*);
 extern int $(module)unsetup(GENmodel*,CKTcircuit*);
-extern void $(module)destroy(GENmodel**);
+extern void $(module)destroy(void);
 
 #endif
 
@@ -61,11 +61,8 @@ extern void $(module)destroy(GENmodel**);
 <admst:for-each select="/module">
   <admst:value-of select="attribute[name='ngspicename']/value"/>
   <admst:open file="%sext.h">
-    <admst:value-of select="/simulator/package_string"/>
-    <admst:text format="/***\n*** Interface: %s\n"/>
-    <admst:value-of select="/simulator/currentdate"/>
-    <admst:value-of select="/simulator/fullname"/>
-    <admst:text format=" *** created by: %s - %s ***/\n"/>
+    <admst:text format="/***\n*** Interface: %(/simulator/package_string)\n"/>
+    <admst:text format=" *** created by: %(/simulator/fullname) ***/\n"/>
     <admst:apply-templates select="." match="code"/>
   </admst:open>
   <admst:value-of select="attribute[name='ngspicename']/value"/>

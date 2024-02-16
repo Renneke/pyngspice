@@ -42,6 +42,7 @@ NON-STANDARD FEATURES
 
 #include "ngspice/cktdefs.h"
 #include "ngspice/cpstd.h"
+#include "ngspice/evt.h"
 #include "ngspice/mifdefs.h"
 #include "ngspice/ipc.h"
 
@@ -64,6 +65,9 @@ void EVTtermInsert(
     char            **err_msg);
 
 int EVTsetup(CKTcircuit *ckt);
+int EVTunsetup(CKTcircuit* ckt);
+
+int EVTdest(Evt_Ckt_Data_t *evt);
 
 int EVTiter(CKTcircuit *ckt);
 
@@ -91,6 +95,10 @@ void EVTdequeue(CKTcircuit *ckt, double time);
 int EVTload(CKTcircuit *ckt, int inst_index);
 
 void EVTprint(wordlist *wl);
+
+void EVTprintvcd(wordlist *wl);
+
+void EVTdisplay(wordlist *wl);
 
 int EVTop(
     CKTcircuit *ckt,

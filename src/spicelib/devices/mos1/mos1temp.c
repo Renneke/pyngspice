@@ -34,7 +34,7 @@ MOS1temp(GENmodel *inModel, CKTcircuit *ckt)
     double fermis;
     double vfb;
     /* loop through all the resistor models */
-    for( ; model != NULL; model = model->MOS1nextModel) {
+    for( ; model != NULL; model = MOS1nextModel(model)) {
         
 
         /* perform model defaulting */
@@ -53,8 +53,8 @@ MOS1temp(GENmodel *inModel, CKTcircuit *ckt)
     /* now model parameter preprocessing */
 
         if (model->MOS1phi <= 0.0) {
-            SPfrontEnd->IFerror (ERR_FATAL,
-               "%s: Phi is not positive.", &model->MOS1modName);
+            SPfrontEnd->IFerrorf (ERR_FATAL,
+               "%s: Phi is not positive.", model->MOS1modName);
             return(E_BADPARM);
         }
 
@@ -105,8 +105,8 @@ MOS1temp(GENmodel *inModel, CKTcircuit *ckt)
                     }
                 } else {
                     model->MOS1substrateDoping = 0;
-                    SPfrontEnd->IFerror (ERR_FATAL,
-                            "%s: Nsub < Ni",&model->MOS1modName);
+                    SPfrontEnd->IFerrorf (ERR_FATAL,
+                            "%s: Nsub < Ni", model->MOS1modName);
                     return(E_BADPARM);
                 }
             }
@@ -114,8 +114,8 @@ MOS1temp(GENmodel *inModel, CKTcircuit *ckt)
 
         
         /* loop through all instances of the model */
-        for(here = model->MOS1instances; here!= NULL; 
-                here = here->MOS1nextInstance) {
+        for(here = MOS1instances(model); here!= NULL; 
+                here = MOS1nextInstance(here)) {
             double czbd;    /* zero voltage bulk-drain capacitance */
             double czbdsw;  /* zero voltage bulk-drain sidewall capacitance */
             double czbs;    /* zero voltage bulk-source capacitance */
@@ -158,9 +158,9 @@ MOS1temp(GENmodel *inModel, CKTcircuit *ckt)
             }
 
             if(here->MOS1l - 2 * model->MOS1latDiff <=0) {
-                SPfrontEnd->IFerror (ERR_WARNING,
+                SPfrontEnd->IFerrorf (ERR_WARNING,
                         "%s: effective channel length less than zero",
-                        &(model->MOS1modName));
+                        model->MOS1modName);
             }
             ratio4 = ratio * sqrt(ratio);
             here->MOS1tTransconductance = model->MOS1transconductance / ratio4;

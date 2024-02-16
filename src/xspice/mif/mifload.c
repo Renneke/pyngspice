@@ -3,11 +3,10 @@ FILE    MIFload.c
 
 MEMBER OF process XSPICE
 
-Copyright 1991
+Public Domain
+
 Georgia Tech Research Corporation
 Atlanta, Georgia 30332
-All Rights Reserved
-
 PROJECT A-8503
 
 AUTHORS
@@ -51,6 +50,8 @@ NON-STANDARD FEATURES
 #include "ngspice/cktdefs.h"
 #include "ngspice/devdefs.h"
 #include "ngspice/sperror.h"
+
+#include "ngspice/evt.h"
 
 #include "ngspice/mifproto.h"
 #include "ngspice/mifparse.h"
@@ -217,7 +218,7 @@ MIFload(
     /* ***************************************************************** */
     /* loop through all models of this type */
     /* ***************************************************************** */
-    for( ; model != NULL; model = model->MIFnextModel) {
+    for( ; model != NULL; model = MIFnextModel(model)) {
       
         /* If not an analog or hybrid model, continue to next */
         if(! model->analog)
@@ -226,7 +227,7 @@ MIFload(
         /* ***************************************************************** */
         /* loop through all instances of this model */
         /* ***************************************************************** */
-        for(here = model->MIFinstances; here != NULL; here = here->MIFnextInstance) {
+        for(here = MIFinstances(model); here != NULL; here = MIFnextInstance(here)) {
             /* If not an analog or hybrid instance, continue to next */
             if(! here->analog)
                 continue;
@@ -435,6 +436,7 @@ MIFload(
             cm_data.param = here->param;
             cm_data.num_inst_var = here->num_inst_var;
             cm_data.inst_var = here->inst_var;
+            cm_data.callback = &(here->callback);
 
             /* Initialize the auto_partial flag to false */
             g_mif_info.auto_partial.local = MIF_FALSE;

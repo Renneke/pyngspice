@@ -87,9 +87,9 @@ int sens_sens(CKTcircuit *ckt, int restart)
 	IFuid		*output_names, freq_name;
 	int		bypass;
 	int		type;
-	double		*saved_rhs = 0,
-			*saved_irhs = 0;
-	SMPmatrix	*saved_matrix = 0;
+	double		*saved_rhs = NULL,
+			*saved_irhs = NULL;
+	SMPmatrix	*saved_matrix = NULL;
 
 #ifndef notdef
 #ifdef notdef
@@ -139,21 +139,21 @@ int sens_sens(CKTcircuit *ckt, int restart)
 		if (error)
 			return error;
 
-		size = spGetSize(ckt->CKTmatrix, 1);
+		size = SMPmatSize(ckt->CKTmatrix);
 
 		/* Create the perturbation matrix */
-		delta_Y = spCreate(size, 1, &error);
+		error = SMPnewMatrix(&delta_Y, size);
 		if (error)
 			return error;
 
 		size += 1;
 
 		/* Create an extra rhs */
-		delta_I = NEWN(double, size);
-		delta_iI = NEWN(double, size);
+		delta_I = TMALLOC(double, size);
+		delta_iI = TMALLOC(double, size);
 
-		delta_I_delta_Y = NEWN(double, size);
-		delta_iI_delta_Y = NEWN(double, size);
+		delta_I_delta_Y = TMALLOC(double, size);
+		delta_iI_delta_Y = TMALLOC(double, size);
 
 
 		num_vars = 0;
@@ -165,7 +165,7 @@ int sens_sens(CKTcircuit *ckt, int restart)
 			return OK;	/* XXXX Should be E_ something */
 
 		k = 0;
-		output_names = NEWN(IFuid, num_vars);
+		output_names = TMALLOC(IFuid, num_vars);
 		for (sg = sgen_init(ckt, is_dc); sg; sgen_next(&sg)) {
 			if (!sg->is_instparam) {
 				sprintf(namebuf, "%s:%s",
@@ -203,11 +203,11 @@ int sens_sens(CKTcircuit *ckt, int restart)
 
 		FREE(output_names);
 		if (is_dc) {
-			output_values = NEWN(double, num_vars);
+			output_values = TMALLOC(double, num_vars);
 			output_cvalues = NULL;
 		} else {
 			output_values = NULL;
-			output_cvalues = NEWN(IFcomplex, num_vars);
+			output_cvalues = TMALLOC(IFcomplex, num_vars);
 			if (job->step_type != SENS_LINEAR)
 			    SPfrontEnd->OUTattributes (sen_data, NULL, OUT_SCALE_LOG, NULL);
 
@@ -351,7 +351,7 @@ int sens_sens(CKTcircuit *ckt, int restart)
 			}
 #endif
 
-			spClear(delta_Y);
+			SMPcClear(delta_Y);
 
 			for (j = 0; j < size; j++) {
 				delta_I[j] = 0.0;
@@ -364,10 +364,15 @@ int sens_sens(CKTcircuit *ckt, int restart)
 			ckt->CKTnumStates = sg->istate;
 
 			fn = DEVices[sg->dev]->DEVsetup;
-			if (fn)
-				fn (delta_Y, sg->model, ckt,
-					/* XXXX insert old state base here ?? */
-					&ckt->CKTnumStates);
+			if (fn) {
+                CKTnode *node = ckt->CKTlastNode;
+                /* XXXX insert old state base here ?? */
+                fn (delta_Y, sg->model, ckt, &ckt->CKTnumStates);
+                if (node != ckt->CKTlastNode) {
+                    fprintf(stderr, "Internal Error: node allocation in DEVsetup() during sensitivity analysis, this will cause serious troubles !, please report this issue !\n");
+                    controlled_exit(EXIT_FAILURE);
+                }
+            }
 
 			/* ? CKTsetup would call NIreinit instead */
 			ckt->CKTniState = NISHOULDREORDER | NIACSHOULDREORDER;
@@ -394,7 +399,7 @@ int sens_sens(CKTcircuit *ckt, int restart)
 #ifdef ASDEBUG
 			DEBUG(2) {
 				printf("Effect of device:\n");
-				spPrint(delta_Y, 0, 1, 1);
+				SMPprint(delta_Y, NULL);
 				printf("LHS:\n");
 				for (j = 0; j < size; j++)
 					printf("%d: %g, %g\n", j,
@@ -418,7 +423,7 @@ int sens_sens(CKTcircuit *ckt, int restart)
 			if (error && error != E_BADPARM)
 				return error;
 
-			spConstMult(delta_Y, -1.0);
+			SMPconstMult(delta_Y, -1.0);
 			for (j = 0; j < size; j++) {
 				delta_I[j] *= -1.0;
 				delta_iI[j] *= -1.0;
@@ -427,7 +432,7 @@ int sens_sens(CKTcircuit *ckt, int restart)
 #ifdef ASDEBUG
 			DEBUG(2) {
 				printf("Effect of negating matrix:\n");
-				spPrint(delta_Y, 0, 1, 1);
+				SMPprint(delta_Y, NULL);
 				for (j = 0; j < size; j++)
 					printf("%d: %g, %g\n", j,
 						delta_I[j], delta_iI[j]);
@@ -453,7 +458,7 @@ int sens_sens(CKTcircuit *ckt, int restart)
 #ifdef ASDEBUG
 			DEBUG(2) {
 				printf("Effect of changing the parameter:\n");
-				spPrint(delta_Y, 0, 1, 1);
+				SMPprint(delta_Y, NULL);
 				for (j = 0; j < size; j++)
 					printf("%d: %g, %g\n", j,
 						delta_I[j], delta_iI[j]);
@@ -477,8 +482,8 @@ int sens_sens(CKTcircuit *ckt, int restart)
 #endif
 
 			/* delta_Y E */
-			spMultiply(delta_Y, delta_I_delta_Y, E,
-				delta_iI_delta_Y, iE);
+			SMPmultiply(delta_Y, delta_I_delta_Y, E,
+				    delta_iI_delta_Y, iE);
 
 #ifdef ASDEBUG
 			DEBUG(2)
@@ -496,14 +501,14 @@ int sens_sens(CKTcircuit *ckt, int restart)
 #ifdef ASDEBUG
 			DEBUG(2) {
 				printf(">>> Y:\n");
-				spPrint(Y, 0, 1, 1);
+				SMPprint(Y, NULL);
 				for (j = 0; j < size; j++)
 					printf("%d: %g, %g\n", j,
 						delta_I[j], delta_iI[j]);
 			}
 #endif
 			/* Solve; Y already factored */
-			spSolve(Y, delta_I, delta_I, delta_iI, delta_iI);
+			SMPcSolve(Y, delta_I, delta_iI, NULL, NULL);
 
                         /* the special `0' node
                         *    the matrix indizes are [1..n]
@@ -596,7 +601,7 @@ int sens_sens(CKTcircuit *ckt, int restart)
 	release_context(ckt->CKTirhs, saved_irhs);
 	release_context(ckt->CKTmatrix, saved_matrix);
 
-	spDestroy(delta_Y);
+	SMPdestroy(delta_Y);
 	FREE(delta_I);
 	FREE(delta_iI);
 

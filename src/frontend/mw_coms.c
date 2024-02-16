@@ -27,7 +27,6 @@ com_removecirc(wordlist *wl)
     int auxCir = 1, i, auxPlot;
 
     char* namecircuit;
-    char buf[80];
 
     NG_IGNORE(wl);
 
@@ -50,7 +49,7 @@ com_removecirc(wordlist *wl)
 
     ct->ci_vars = NULL;
     caux = ft_circuits;
-    namecircuit = strdup(ft_curckt->ci_name);
+    namecircuit = copy(ft_curckt->ci_name);
 
     /* The circuit  being removed is the first loaded and you have more circuits */
     if (ft_curckt == ft_circuits  &&  ft_circuits->ci_next)
@@ -113,15 +112,13 @@ com_removecirc(wordlist *wl)
 
     if (ft_circuits && caux->ci_next) {
         struct wordlist *wlist;
-        sprintf(buf, "%d", auxCir);
-        wlist = wl_cons(copy(buf), NULL);
+        wlist = wl_cons(tprintf("%d", auxCir), NULL);
         com_scirc(wlist);
         wl_free(wlist);
     }
     else if (ft_circuits) {
         struct wordlist *wlist;
-        sprintf(buf, "%d", auxCir-1);
-        wlist = wl_cons(copy(buf), NULL);
+        wlist = wl_cons(tprintf("%d", auxCir - 1), NULL);
         com_scirc(wlist);
         wl_free(wlist);
     }

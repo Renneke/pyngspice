@@ -6,15 +6,49 @@
 #
 #  Rel  Date            Who             Comments
 # ====  ==========      =============   ========
+#  1.1  07/05/17        Dietmar Warning Version detection included
 #  1.0  05/13/11        Dietmar Warning Initial version
 #
 
 package simulate;
+if (defined($main::simulatorCommand)) {
+    $simulatorCommand=$main::simulatorCommand;
+} else {
+    $simulatorCommand="ngspice";
+}
 $netlistFile="ngspiceCkt";
 use strict;
 
 sub version {
-    return("26"); # the version only seems to be printed in interactive mode
+    my($version,$vaVersion);
+    $version="unknown";
+    $vaVersion="unknown";
+    if (!open(OF,">$simulate::netlistFile")) {
+        die("ERROR: cannot open file $simulate::netlistFile, stopped");
+    }
+    print OF "version test";
+    print OF "r1 1 0 1";
+    print OF "v1 1 0 1";
+    print OF ".control";
+    print OF "version";
+    print OF ".endc";
+    print OF ".end";
+    close(OF);
+    if (!open(SIMULATE,"$simulate::simulatorCommand < $simulate::netlistFile 2>/dev/null|")) {
+        die("ERROR: cannot run $simulate::simulatorCommand, stopped");
+    }
+    while (<SIMULATE>) {
+        chomp;
+        # Check whether this line is the one we are looking for.
+        # Also the term in parenthesis "()" stores the number to $1 which we can reuse later.
+        if (m/.+ngspice-([0-9]+)/) {
+            # Simple read the stored group from the matching in the if clause
+            $version=$1;
+            last;
+        }
+    }
+    close(SIMULATE);
+    return($version,$vaVersion);
 }
 
 sub runNoiseTest {
@@ -51,7 +85,7 @@ sub runNoiseTest {
                 print OF "* Noise simulation for $main::simulatorName";
                 &generateCommonNetlistInfo($variant,$temperature);
                 print OF "vin dummy 0 0 ac 1";
-                print OF "rin dummy 0 1";
+                print OF "rin dummy 0 1.0 noise=0";
                 foreach $pin (@main::Pin) {
                     if ($main::isFloatingPin{$pin}) {
                         print OF "i_$pin $pin 0 0";
@@ -65,6 +99,9 @@ sub runNoiseTest {
                 }
                 print OF "x1 ".join(" ",@main::Pin)." mysub";
                 print OF "hn 0 n_$noisePin v_$noisePin 1";
+                print OF ".control";
+                print OF "set sqrnoise";
+                print OF ".endc";
                 print OF ".noise v(n_$noisePin) vin $main::frequencySpec";
                 print OF ".print noise all";
                 print OF ".end";
@@ -74,8 +111,8 @@ sub runNoiseTest {
 #   Run simulations and get the results
 #
 
-                if (!open(SIMULATE,"$main::simulatorCommand < $simulate::netlistFile 2>/dev/null|")) {
-                    die("ERROR: cannot run $main::simulatorCommand, stopped");
+                if (!open(SIMULATE,"$simulate::simulatorCommand < $simulate::netlistFile 2>/dev/null|")) {
+                    die("ERROR: cannot run $simulate::simulatorCommand, stopped");
                 }
                 $inData=0;
                 while (<SIMULATE>) {
@@ -200,8 +237,8 @@ sub runAcTest {
 #   Run simulations and get the results
 #
 
-                if (!open(SIMULATE,"$main::simulatorCommand < $simulate::netlistFile 2>/dev/null|")) {
-                    die("ERROR: cannot run $main::simulatorCommand, stopped");
+                if (!open(SIMULATE,"$simulate::simulatorCommand < $simulate::netlistFile 2>/dev/null|")) {
+                    die("ERROR: cannot run $simulate::simulatorCommand, stopped");
                 }
                 $inData=0;
                 while (<SIMULATE>) {
@@ -337,8 +374,8 @@ sub runDcTest {
 #   Run simulations and get the results
 #
 
-            if (!open(SIMULATE,"$main::simulatorCommand < $simulate::netlistFile 2>/dev/null|")) {
-                die("ERROR: cannot run $main::simulatorCommand, stopped");
+            if (!open(SIMULATE,"$simulate::simulatorCommand < $simulate::netlistFile 2>/dev/null|")) {
+                die("ERROR: cannot run $simulate::simulatorCommand, stopped");
             }
             $inResults=0;
             while (<SIMULATE>) {
@@ -398,7 +435,7 @@ sub generateCommonNetlistInfo {
     my($variant,$temperature)=@_;
     my(@Pin_x,$arg,$name,$value,$eFactor,$fFactor,$pin);
     foreach $pin (@main::Pin) {push(@Pin_x,"${pin}_x")}
-    print OF ".options temp=$temperature gmin=1e-15 abstol=1e-14 reltol=1e-8";
+    print OF ".options temp=$temperature gmin=1e-13 abstol=1e-13 reltol=1e-3";
     if ($variant=~/^scale$/) {
         die("ERROR: there is no scale or shrink option for ngspice, stopped");
     }

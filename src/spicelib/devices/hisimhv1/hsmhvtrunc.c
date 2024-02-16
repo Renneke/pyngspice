@@ -4,11 +4,11 @@
  Copyright (C) 2012 Hiroshima University & STARC
 
  MODEL NAME : HiSIM_HV 
- ( VERSION : 1  SUBVERSION : 2  REVISION : 3 )
+ ( VERSION : 1  SUBVERSION : 2  REVISION : 4 )
  Model Parameter VERSION : 1.23
  FILE : hsmhvtrunc.c
 
- DATE : 2012.4.6
+ DATE : 2013.04.30
 
  released by 
                 Hiroshima University &
@@ -33,9 +33,9 @@ int HSMHVtrunc(
   double debugtemp=0.0 ;
 #endif /* STEPDEBUG */
   
-  for ( ;model != NULL ;model = model->HSMHVnextModel ) {
-    for ( here=model->HSMHVinstances ;here!=NULL ;
-	  here = here->HSMHVnextInstance ) {
+  for ( ;model != NULL ;model = HSMHVnextModel(model)) {
+    for ( here=HSMHVinstances(model);here!=NULL ;
+	  here = HSMHVnextInstance(here)) {
 #ifdef STEPDEBUG
       debugtemp = *timeStep;
 #endif /* STEPDEBUG */

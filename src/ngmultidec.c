@@ -136,7 +136,7 @@ main (int argc, char **argv)
     exit(1);
   }
 
-  if ( (k<0.0?-k:k) >=1.0 ) {
+  if (fabs(k) >= 1.0) {
     fprintf(stderr,"Error: |k| must be less than 1.0\n");
     fflush(stderr);
     exit(1);
@@ -264,8 +264,7 @@ main (int argc, char **argv)
   fprintf(stdout,"\n");
   fprintf(stdout,"* Lossy line models\n");
 
-  options = TMALLOC(char, 256);
-  (void) strcpy(options,"rel=1.2 nocontrol");
+  options = "rel=1.2 nocontrol";
   for (i=1;i<=num;i++) {
     fprintf(stdout,".model mod%d_%s ltra %s r=%0.12g l=%0.12g g=%0.12g c=%0.12g len=%0.12g\n",
 	    i,name,options,r,l+tpeigenvalues[i]*lm,g,ctot-tpeigenvalues[i]*cm,len);
@@ -335,7 +334,6 @@ main (int argc, char **argv)
   tfree(matrix);
   tfree(inverse);
   tfree(name);
-  tfree(options);
 
   return EXIT_NORMAL; 
 }

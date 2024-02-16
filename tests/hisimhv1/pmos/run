@@ -1,5 +1,8 @@
 #!/bin/sh
 
-../../bin/run_cmc_check clean
-cp qaSpec.basic qaSpec
-../../bin/run_cmc_check ngspice | tee cmcqa_basic.log
+simulator="$1"
+if [ -z "$1" ] ; then
+  simulator="ngspice"
+fi 
+
+../../bin/run_cmc_check clean_${simulator} $simulator | tee cmcqa_${simulator}.log

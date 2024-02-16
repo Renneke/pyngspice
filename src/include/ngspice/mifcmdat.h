@@ -328,6 +328,7 @@ typedef struct Mif_Param_Data_s {
     Mif_Boolean_t   is_null;            /* True if no value given on .model card */
     int             size;               /* Size of array (1 if scalar)           */
     Mif_Value_t     *element;           /* Value of parameter(s)                 */
+    int             eltype;             /* type of the element                   */
 
 } Mif_Param_Data_t;
 
@@ -357,7 +358,7 @@ typedef struct Mif_Inst_Var_Data_s {
  * The top level data structure passed to code models.
  */
 
-typedef struct Mif_Private_s {
+struct Mif_Private {
 
     Mif_Circ_Data_t        circuit;       /* Information about the circuit        */
     int                    num_conn;      /* Number of connections on this model  */
@@ -366,8 +367,9 @@ typedef struct Mif_Private_s {
     Mif_Param_Data_t       **param;       /* Information about each parameter     */
     int                    num_inst_var;  /* Number of instance variables         */
     Mif_Inst_Var_Data_t    **inst_var;    /* Information about each inst variable */
+    Mif_Callback_t         *callback;     /* Callback function */
 
-} Mif_Private_t;
+};
 
 
 

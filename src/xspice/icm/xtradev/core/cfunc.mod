@@ -3,10 +3,10 @@
 
 FILE core/cfunc.mod
 
-Copyright 1991
-Georgia Tech Research Corporation, Atlanta, Ga. 30332
-All Rights Reserved
+Public Domain
 
+Georgia Tech Research Corporation
+Atlanta, Georgia 30332
 PROJECT A-8503-405
 
 
@@ -294,8 +294,8 @@ cm_core(ARGS)
             /*** must determine position progressively & then ***/
             /*** calculate required output. ***/
 
-            dout_din = 0.0 / 0.0;
-            B_out    = 0.0 / 0.0;
+            dout_din = NAN;
+            B_out    = NAN;
 
             for (i = 1; i < size; i++)
                 if (H_input < (H[i].rvalue + H[i+1].rvalue) / 2.0) {

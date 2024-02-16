@@ -4,11 +4,11 @@
  Copyright (C) 2012 Hiroshima University & STARC
 
  MODEL NAME : HiSIM_HV 
- ( VERSION : 1  SUBVERSION : 2  REVISION : 3 )
+ ( VERSION : 1  SUBVERSION : 2  REVISION : 4 )
  Model Parameter VERSION : 1.23
  FILE : hsmhvask.c
 
- DATE : 2012.4.6
+ DATE : 2013.04.30
 
  released by 
                 Hiroshima University &
@@ -53,7 +53,7 @@ int HSMHVask(
   here->HSMHV_csso = - (here->HSMHV_csdo + here->HSMHV_csgo + here->HSMHV_csbo) ;
 
   /* NQS? */
-  if (here->HSMHVQIqiPtr == (double *)NULL) {
+  if (here->HSMHVQIqiPtr == NULL) {
     flg_nqs = 0 ;
   } else {
     flg_nqs = 1 ;

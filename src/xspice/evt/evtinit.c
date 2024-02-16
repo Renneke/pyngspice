@@ -3,11 +3,10 @@ FILE    EVTinit.c
 
 MEMBER OF process XSPICE
 
-Copyright 1991
+Public Domain
+
 Georgia Tech Research Corporation
 Atlanta, Georgia 30332
-All Rights Reserved
-
 PROJECT A-8503
 
 AUTHORS
@@ -45,6 +44,7 @@ NON-STANDARD FEATURES
 //#include  "util.h"
 #include  "ngspice/sperror.h"
 
+#include  "ngspice/evt.h"
 #include  "ngspice/evtproto.h"
 
 
@@ -217,10 +217,9 @@ static int EVTcheck_nodes(
         analog_node = ckt->CKTnodes;
         while(analog_node) {
             if(strcmp(event_node->name, analog_node->name) == 0) {
-                errMsg = TMALLOC(char, strlen(err_prefix) + strlen(event_node->name) + strlen(err_collide) + 1);
-                sprintf(errMsg, "%s%s%s", err_prefix,
-                                          event_node->name,
-                                          err_collide);
+                errMsg = tprintf("%s%s%s", err_prefix,
+                                   event_node->name,
+                                   err_collide);
                 fprintf(stdout, "%s\n", errMsg);
                 return(E_PRIVATE);
             }

@@ -93,7 +93,6 @@ char *MIFgetMod(
     char * line;
     char *parm;
     char *err = NULL;
-    char *temp;
     int error;
 
     int               i;
@@ -114,7 +113,7 @@ char *MIFgetMod(
 
     /* maschmann : remove : from name
      *    char *pos;
-     * if((pos=strstr(name,":"))!=NULL) *pos=0;   
+     * if((pos=strchr(name,':'))!=NULL) *pos=0;   
      */
 
     /*------------------------------------
@@ -147,14 +146,7 @@ char *MIFgetMod(
 	if(modtmp->INPmodType < 0) {
                 /* illegal device type, so can't handle */
                 *model = NULL;
-
-		/* fixed by SDB -- magic number is 39, not 35.  
-		 * Also needed parens to correctly compute # of bytes to malloc
-		 */
-                err = TMALLOC(char, 39 + strlen(name)); 
-
-                sprintf(err, "MIF: Unknown device type for model %s \n",name);
-                return(err);
+                return tprintf("MIF: Unknown device type for model %s\n", name);
             }
 
             /* check to see if this model's parameters have been processed */
@@ -182,7 +174,7 @@ char *MIFgetMod(
                 line = modtmp->INPmodLine->line;
                 INPgetTok(&line,&parm,1);     /* throw away '.model' */
                 tfree(parm);
-                INPgetTok(&line,&parm,1);     /* throw away 'modname' */
+                INPgetNetTok(&line,&parm,1);     /* throw away 'modname' */
                 tfree(parm);
 
                 /* throw away the modtype - we don't treat it as a parameter */
@@ -190,7 +182,7 @@ char *MIFgetMod(
                 INPgetTok(&line,&parm,1);     /* throw away 'modtype' */
                 tfree(parm);
 
-                while(*line != 0) {
+                while(*line != '\0') {
                     INPgetTok(&line,&parm,1);
                     for(j=0 ; j < *(ft_sim->devices[modtmp->INPmodType]->numModelParms); j++) {
                         if (strcmp(parm, ft_sim->devices[modtmp->INPmodType]->modelParms[j].keyword) == 0) {
@@ -200,36 +192,37 @@ char *MIFgetMod(
                                     ft_sim->devices[modtmp->INPmodType]->modelParms[j].dataType,
                                     tab, &err1);
                             if(err1) {
-                                err2 = TMALLOC(char, 25 + strlen(name) + strlen(err1));
-                                sprintf(err2, "MIF-ERROR - model: %s - %s\n", name, err1);
+                                err2 = tprintf("MIF-ERROR - model: %s - %s\n", name, err1);
                                 return(err2);
                             }
                             error = ft_sim->setModelParm (ckt,
                                     modtmp->INPmodfast,
                                     ft_sim->devices[modtmp->INPmodType]->modelParms[j].id,
                                     val, NULL);
+                            /* free val, allocated by MIFgetValue */
+                            int vtype = (ft_sim->devices[modtmp->INPmodType]->modelParms[j].dataType & IF_VARTYPES);
+                            if (vtype == IF_FLAGVEC || vtype == IF_INTVEC)
+                                tfree(val->v.vec.iVec);
+                            if (vtype == IF_REALVEC)
+                                tfree(val->v.vec.rVec);
+                            if (vtype == IF_CPLXVEC)
+                                tfree(val->v.vec.cVec);
+                            if (vtype == IF_STRING)
+                                tfree(val->sValue);
+                            if (vtype == IF_STRINGVEC) {
+                                for (i = 0; i < val->v.numValue; i++)
+                                    tfree(val->v.vec.sVec[i]);
+                                tfree(val->v.vec.sVec);
+                            }
                             if(error)
                                 return(INPerror(error));
                             break;
                         }
                     }
                     /* gtri modification: processing of special parameter "level" removed */
-                    if(j >= *(ft_sim->devices[modtmp->INPmodType]->numModelParms))
-					{
-						//err has not been allocated, but free() in INPerrCat()
-
-						// This did not allocate enough memory you wanker, K.A. replaced 5 March 2000
-		// temp = TMALLOC(char, 40 + strlen(parm));
-						temp = TMALLOC(char, 42 + strlen(parm));// K.A. replaced 5 March 2000
-
-						sprintf(temp, "MIF: unrecognized parameter (%s) - ignored\n", parm);
-
-						fprintf(stdout, "%s", temp);
-						err = TMALLOC(char, 2 * strlen(temp) + 2);// K.A. added 5 March 2000
-                  
-						*err = '\0';// K.A. added 5 March 2000
-
-                        err = INPerrCat(err,temp);
+                    if(j >= *(ft_sim->devices[modtmp->INPmodType]->numModelParms)) {
+                        char *temp = tprintf("MIF: unrecognized parameter (%s) - ignored", parm);
+                        err = INPerrCat(err, temp);
                     }
                     FREE(parm);
 
@@ -249,8 +242,7 @@ char *MIFgetMod(
 
     /* didn't find model - ERROR  - return NULL model */
     *model = NULL;
-    err = TMALLOC(char, 60 + strlen(name));
-    sprintf(err, " MIF-ERROR - unable to find definition of model %s\n",name);
+    err = tprintf(" MIF-ERROR - unable to find definition of model %s\n", name);
 
     return(err);
 }

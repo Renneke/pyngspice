@@ -4,11 +4,11 @@
  Copyright (C) 2012 Hiroshima University & STARC
 
  MODEL NAME : HiSIM_HV 
- ( VERSION : 1  SUBVERSION : 2  REVISION : 3 )
+ ( VERSION : 1  SUBVERSION : 2  REVISION : 4 )
  Model Parameter VERSION : 1.23
  FILE : hsmhvtemp.c
 
- DATE : 2012.4.6
+ DATE : 2013.04.30
 
  released by
                 Hiroshima University &
@@ -73,7 +73,7 @@ int HSMHVtemp(
   double T0, T1, T2, T3, T4, T5, T6, T7 ;
   /* temperature-dependent variables */
   double Eg =0.0, TTEMP0=0.0, TTEMP=0.0, beta=0.0, Nin=0.0 ;
-  double Tdiff0 = 0.0, Tdiff0_2 = 0.0, Tdiff = 0.0, Tdiff_2 = 0.0 ;
+  double /*Tdiff0 = 0.0, Tdiff0_2 = 0.0,*/ Tdiff = 0.0, Tdiff_2 = 0.0 ;
   double js=0.0, jssw=0.0, js2=0.0, jssw2 =0.0 ;
   int i=0 ;
   double TMF1 , TMF2 ;
@@ -81,7 +81,7 @@ int HSMHVtemp(
   const double dlt_rd23 = 1.0e-6 / C_m2cm ;
   const double large_arg = 80 ;
 
-  for ( ;model ;model = model->HSMHVnextModel ) {
+  for ( ;model ;model = HSMHVnextModel(model)) {
 
     modelMKS = &model->modelMKS ;
 
@@ -95,7 +95,7 @@ int HSMHVtemp(
       model->HSMHV_qme12 = model->HSMHV_qme1 / ( model->HSMHV_qme2 * model->HSMHV_qme2 ) ;
     }
 
-    for ( here = model->HSMHVinstances; here; here = here->HSMHVnextInstance ) {
+    for ( here = HSMHVinstances(model); here; here = HSMHVnextInstance(here)) {
 
       pParam = &here->pParam ;
 
@@ -206,15 +206,11 @@ int HSMHVtemp(
     
       Leff = Lgate - ( dL + dLLD ) ;
       if ( Leff <= 0.0 ) {   
-        IFuid namarr[2];
-        namarr[0] = model->HSMHVmodName;
-        namarr[1] = here->HSMHVname;
-        (*(SPfrontEnd->IFerror))
+        SPfrontEnd->IFerrorf
           ( 
            ERR_FATAL, 
            "HiSIM_HV: MOSFET(%s) MODEL(%s): effective channel length is negative or 0", 
-           namarr 
-           );
+           model->HSMHVmodName, here->HSMHVname);
         return (E_BADPARM);
       }
       here->HSMHV_leff = Leff ;
@@ -232,15 +228,11 @@ int HSMHVtemp(
       here->HSMHV_weff_ld     = Wgate - 2.0e0 * dWLD ;
       here->HSMHV_weff_cv     = Wgate - 2.0e0 * dWCV ;
       if ( Weff <= 0.0 ) {   
-        IFuid namarr[2];
-        namarr[0] = model->HSMHVmodName;
-        namarr[1] = here->HSMHVname;
-        (*(SPfrontEnd->IFerror))
+        SPfrontEnd->IFerrorf
           ( 
            ERR_FATAL, 
            "HiSIM_HV: MOSFET(%s) MODEL(%s): effective channel width is negative or 0", 
-           namarr 
-           );
+           model->HSMHVmodName, here->HSMHVname);
         return (E_BADPARM);
       }
       here->HSMHV_weff_nf = Weff * here->HSMHV_nf ;
@@ -333,9 +325,9 @@ int HSMHVtemp(
 	here->HSMHV_rd0 = 0.0 ;
       }
       if ( pParam->HSMHV_rd > 0.0 || pParam->HSMHV_rs > 0.0 ) {
-        here->HSMHV_rdtemp0 = 1.0 + model->HSMHV_rds / pow( here->HSMHV_w * C_m2um * LG , model->HSMHV_rdsp ) ;
+        here->HSMHV_rdtemp0 = 1.0 + model->HSMHV_rds / pow( WL , model->HSMHV_rdsp ) ;
 	if( pParam->HSMHV_rdvd != 0.0 ){
-	  T7 = ( 1.0 + model->HSMHV_rdvds / pow( here->HSMHV_w * C_m2um * LG , model->HSMHV_rdvdsp ) );
+	  T7 = ( 1.0 + model->HSMHV_rdvds / pow( WL , model->HSMHV_rdvdsp ) );
           T6 = ( - model->HSMHV_rdvdl * pow( LG , model->HSMHV_rdvdlp ) ) ;
           if(T6 > large_arg) T6 = large_arg ;  
           T6 = exp( T6 ) ;
@@ -343,7 +335,7 @@ int HSMHVtemp(
         }
       }
       if( pParam->HSMHV_rd23 != 0.0 ){
-	T2 = ( 1.0 + model->HSMHV_rd23s / pow( here->HSMHV_w * C_m2um * LG , model->HSMHV_rd23sp ) );
+	T2 = ( 1.0 + model->HSMHV_rd23s / pow( WL , model->HSMHV_rd23sp ) );
         T1 = ( - model->HSMHV_rd23l * pow( LG , model->HSMHV_rd23lp ) ) ;
         if(T1 > large_arg)  T1 = large_arg ; 
         T1 = exp( T1 ) ;
@@ -407,13 +399,13 @@ int HSMHVtemp(
 
       /* Self heating */
       pParam->HSMHV_rth = pParam->HSMHV_rth0 / ( here->HSMHV_m * here->HSMHV_weff_nf )
-	* ( 1.0 + model->HSMHV_rth0w / pow( here->HSMHV_w * C_m2um , model->HSMHV_rth0wp ) );
+	* ( 1.0 + model->HSMHV_rth0w / pow( WG , model->HSMHV_rth0wp ) );
       pParam->HSMHV_cth = modelMKS->HSMHV_cth0 * ( here->HSMHV_m * here->HSMHV_weff_nf ) ;
 
       pParam->HSMHV_rth *= ( 1.0 / pow( here->HSMHV_nf , model->HSMHV_rth0nf ) ) ;
       
       here->HSMHV_rthtemp0 = 1.0 / pow( here->HSMHV_nf , model->HSMHV_rth0nf ) / ( here->HSMHV_m * here->HSMHV_weff_nf )
-       * ( 1.0 + model->HSMHV_rth0w / pow( here->HSMHV_w * C_m2um , model->HSMHV_rth0wp ) );
+       * ( 1.0 + model->HSMHV_rth0w / pow( WG , model->HSMHV_rth0wp ) );
 
 
       /*-----------------------------------------------------------*

@@ -23,20 +23,15 @@ Copyright 1990 Regents of the University of California.  All rights reserved.
 char *
 smktemp(char *id)
 {
-    char	rbuf[513];
-    char	*nbuf;
-    int		num;
-
-
-    num = getpid( );
-
-
     if (!id)
-	id = "sp";
-
-    sprintf(rbuf, TEMPFORMAT, id, num);
-    nbuf = TMALLOC(char, strlen(rbuf) + 1);
-    strcpy(nbuf, rbuf);
-
-    return nbuf;
+        id = "sp";
+    const char* const home = getenv("HOME");
+    if (home) {
+        return tprintf("%s/"TEMPFORMAT, home, id, getpid());
+    }
+    const char* const usr = getenv("USERPROFILE");
+    if (usr) {
+        return tprintf("%s\\"TEMPFORMAT, usr, id, getpid());
+    }
+    return tprintf(TEMPFORMAT, id, getpid());
 }

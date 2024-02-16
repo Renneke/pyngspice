@@ -56,15 +56,24 @@
  *    Matrix type and macro definitions for the sparse matrix routines.
  */
 #include <assert.h>
-
 #define spINSIDE_SPARSE
 #include "spconfig.h"
 #include "ngspice/spmatrix.h"
 #include "spdefs.h"
 
-
-
-
+#ifdef HAS_WINGUI
+extern void SetAnalyse(char *Analyse, int Percent);
+/* to increase responsiveness of Windows GUI */
+#define INCRESP \
+do { \
+    static int ii = 100; \
+    ii--;\
+    if (ii == 0) { \
+        SetAnalyse("or", 0); \
+        ii = 100; \
+    } \
+} while(0)
+#endif
 
 /*
  * Function declarations
@@ -214,6 +223,10 @@ spOrderAndFactor(MatrixPtr Matrix, RealNumber RHS[], RealNumber RelThreshold,
     if (!Matrix->NeedsOrdering) {
         /* Matrix has been factored before and reordering is not required. */
         for (Step = 1; Step <= Size; Step++) {
+#ifdef HAS_WINGUI
+            /* macro to improve responsiveness of Windows GUI */
+            INCRESP;
+#endif
             pPivot = Matrix->Diag[Step];
             LargestInCol = FindLargestInCol(pPivot->NextInCol);
             if ((LargestInCol * RelThreshold < ELEMENT_MAG(pPivot))) {
@@ -258,6 +271,10 @@ spOrderAndFactor(MatrixPtr Matrix, RealNumber RHS[], RealNumber RelThreshold,
 
     /* Perform reordering and factorization. */
     for (; Step <= Size; Step++) {
+#ifdef HAS_WINGUI
+        /* macro to improve responsiveness of Windows GUI */
+        INCRESP;
+#endif
         pPivot = SearchForPivot( Matrix, Step, DiagPivoting );
         if (pPivot == NULL) return MatrixIsSingular( Matrix, Step );
         ExchangeRowsAndCols( Matrix, pPivot, Step );
@@ -339,6 +356,11 @@ spFactor(MatrixPtr Matrix)
         return FactorComplexMatrix( Matrix );
 
     Size = Matrix->Size;
+
+    if (Size == 0) {
+        Matrix->Factored = YES;
+        return (Matrix->Error = spOKAY);
+    }
 
     if (Matrix->Diag[1]->Real == 0.0) return ZeroPivot( Matrix, 1 );
     Matrix->Diag[1]->Real = 1.0 / Matrix->Diag[1]->Real;
@@ -443,6 +465,12 @@ FactorComplexMatrix( MatrixPtr Matrix )
     assert(Matrix->Complex);
 
     Size = Matrix->Size;
+
+    if (Size == 0) {
+        Matrix->Factored = YES;
+        return (Matrix->Error = spOKAY);
+    }
+
     pElement = Matrix->Diag[1];
     if (ELEMENT_MAG(pElement) == 0.0) return ZeroPivot( Matrix, 1 );
     /* Cmplx expr: *pPivot = 1.0 / *pPivot. */

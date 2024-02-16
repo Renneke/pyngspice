@@ -366,6 +366,10 @@ BSIM3v32mAsk (CKTcircuit *ckt, GENmodel *inst, int which, IFvalue *value)
             value->rValue = model->BSIM3v32wmlt;
             return(OK);
 
+        case BSIM3v32_MOD_LMLT:
+            value->rValue = model->BSIM3v32lmlt;
+            return(OK);
+
         /* Length dependence */
         case  BSIM3v32_MOD_LCDSC :
           value->rValue = model->BSIM3v32lcdsc;
@@ -1292,6 +1296,21 @@ BSIM3v32mAsk (CKTcircuit *ckt, GENmodel *inst, int which, IFvalue *value)
             return(OK);
         case BSIM3v32_MOD_VBD_MAX:
             value->rValue = model->BSIM3v32vbdMax;
+            return(OK);
+        case BSIM3v32_MOD_VGSR_MAX:
+            value->rValue = model->BSIM3v32vgsrMax;
+            return(OK);
+        case BSIM3v32_MOD_VGDR_MAX:
+            value->rValue = model->BSIM3v32vgdrMax;
+            return(OK);
+        case BSIM3v32_MOD_VGBR_MAX:
+            value->rValue = model->BSIM3v32vgbrMax;
+            return(OK);
+        case BSIM3v32_MOD_VBSR_MAX:
+            value->rValue = model->BSIM3v32vbsrMax;
+            return(OK);
+        case BSIM3v32_MOD_VBDR_MAX:
+            value->rValue = model->BSIM3v32vbdrMax;
             return(OK);
 
         default:

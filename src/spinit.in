@@ -7,16 +7,19 @@ set x11lineararcs
 *set filetype=ascii
 ** frontend debug output **
 *set ngdebug
-** no asking after quit **
-set noaskquit
+** asking after quit **
+*set askquit
 ** set the number of threads in openmp
 ** default (if compiled with --enable-openmp) is: 2
 *set num_threads=4
+set interactive
+* step size is limited to TSTEP in tansient simulation
+set stepsizelimit
 
 strcmp __flag $program "ngspice"
 if $__flag = 0
 
-* For SPICE2 POLYs, edit the below line to point to the location 
+* For SPICE2 POLYs, edit the below line to point to the location
 * of your codemodel.
 
 @XSPICEINIT@ codemodel @pkglibdir@/spice2poly.cm
@@ -26,6 +29,7 @@ if $__flag = 0
 @XSPICEINIT@ codemodel @pkglibdir@/digital.cm
 @XSPICEINIT@ codemodel @pkglibdir@/xtradev.cm
 @XSPICEINIT@ codemodel @pkglibdir@/xtraevt.cm
+@XSPICEINIT@ codemodel @pkglibdir@/table.cm
 
 end
 unset __flag

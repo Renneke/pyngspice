@@ -3,10 +3,10 @@
 
 FILE d_source/cfunc.mod
 
-Copyright 1991
-Georgia Tech Research Corporation, Atlanta, Ga. 30332
-All Rights Reserved
+Public Domain
 
+Georgia Tech Research Corporation
+Atlanta, Georgia 30332
 PROJECT A-8503-405
 
 
@@ -61,7 +61,7 @@ NON-STANDARD FEATURES
 
 /*=== CONSTANTS ========================*/
 
-#define MAX_STRING_SIZE 200
+#define MAX_STRING_SIZE 1024
 
 
 /*=== MACROS ===========================*/
@@ -72,9 +72,6 @@ NON-STANDARD FEATURES
 #define DIR_PATHSEP    "/"
 #endif
 
-#ifdef _MSC_VER
-#define snprintf _snprintf
-#endif
 
 /*=== LOCAL VARIABLES & TYPEDEFS =======*/
 
@@ -174,7 +171,7 @@ static char  *CNVgettok(char **s)
 
     /* skip over any white space */
 
-    while(isspace(**s) || (**s == '=') ||
+    while(isspace_c(**s) || (**s == '=') ||
           (**s == '(') || (**s == ')') || (**s == ','))
           (*s)++;
 
@@ -192,7 +189,7 @@ static char  *CNVgettok(char **s)
                          /* or a mess o' characters.            */
         i = 0;
         while( (**s != '\0') &&
-               (! ( isspace(**s) || (**s == '=') ||
+               (! ( isspace_c(**s) || (**s == '=') ||
                     (**s == '(') || (**s == ')') ||
                     (**s == ',')
              ) )  ) {
@@ -206,7 +203,7 @@ static char  *CNVgettok(char **s)
 
     /* skip over white space up to next token */
 
-    while(isspace(**s) || (**s == '=') ||
+    while(isspace_c(**s) || (**s == '=') ||
           (**s == '(') || (**s == ')') || (**s == ','))
           (*s)++;
 
@@ -380,9 +377,9 @@ double  *p_value )   /* OUT - The numerical value     */
 
     for(i = 0; i < len; i++) {
         c = str[i];
-        if( isalpha(c) && (c != 'E') && (c != 'e') )
+        if( isalpha_c(c) && (c != 'E') && (c != 'e') )
             break;
-        else if( isspace(c) )
+        else if( isspace_c(c) )
             break;
         else
             val_str[i] = c;
@@ -392,12 +389,12 @@ double  *p_value )   /* OUT - The numerical value     */
 
     /* Determine the scale factor */
 
-    if( (i >= len) || (! isalpha(c)) )
+    if( (i >= len) || (! isalpha_c(c)) )
         scale_factor = 1.0;
     else {
 
-        if(isupper(c))
-            c = (char) tolower(c);
+        if(isupper_c(c))
+            c = tolower_c(c);
 
         switch(c) {
 
@@ -436,12 +433,12 @@ double  *p_value )   /* OUT - The numerical value     */
                 break;
             }
             c1 = str[i];
-            if(! isalpha(c1)) {
+            if(! isalpha_c(c1)) {
                 scale_factor = 1.0e-3;
                 break;
             }
-            if(islower(c1))
-                c1 = (char) toupper(c1);
+            if(islower_c(c1))
+                c1 = toupper_c(c1);
             if(c1 == 'E')
                 scale_factor = 1.0e6;
             else if(c1 == 'I')
@@ -698,7 +695,7 @@ NON-STANDARD FEATURES
 
 static int cm_read_source(FILE *source, Local_Data_t *loc)
 {
-    size_t      n;  /* loop index */
+    int         n;  /* loop index */
     int         i,  /* indexing variable    */
                 j,  /* indexing variable    */
        num_tokens;  /* number of tokens in a given string    */
@@ -725,7 +722,7 @@ static int cm_read_source(FILE *source, Local_Data_t *loc)
         /* Test this string to see if it is whitespace... */
 
         base_address = s;
-        while(isspace(*s) || (*s == '*'))
+        while(isspace_c(*s) || (*s == '*'))
               (s)++;
         if ( *s != '\0' ) {     /* This is not a blank line, so process... */
             s = base_address;
@@ -752,8 +749,8 @@ static int cm_read_source(FILE *source, Local_Data_t *loc)
                 s = base_address;
 
                 /* set storage space for bits in a row and set them to 0*/
-                loc->all_data[i] = (char*)malloc(sizeof(char) * loc->width);
-                for (n = 0; n < (unsigned int)loc->width; n++)
+                loc->all_data[i] = (char*)malloc(sizeof(char) * (size_t) loc->width);
+                for (n = 0; n < loc->width; n++)
                     loc->all_data[i][n] = 0;
 
                 /** Retrieve each token, analyze, and       **/
@@ -936,11 +933,8 @@ void cm_d_source(ARGS)
                 source = fopen(p, "r");
                 free(p);
             }
-            if (!source) {
-                char msg[512];
-                snprintf(msg, sizeof(msg), "cannot open file %s", PARAM(input_file));
-                cm_message_send(msg);
-            }
+            if (!source)
+                cm_message_printf("cannot open file %s", PARAM(input_file));
         }
 
         /* increment counter if not a comment until EOF reached... */
@@ -949,7 +943,7 @@ void cm_d_source(ARGS)
           s = temp;
           while ( fgets(s,MAX_STRING_SIZE,source) != NULL) {
               if ( '*' != s[0] ) {
-                  while(isspace(*s) || (*s == '*'))
+                  while(isspace_c(*s) || (*s == '*'))
                         (s)++;
                   if ( *s != '\0' ) i++;
               }
@@ -982,8 +976,8 @@ void cm_d_source(ARGS)
         loc->width = PORT_SIZE(out);
 
         /*** allocate storage for **all_data, & *all_timepoints ***/
-        loc->all_timepoints = (double*)calloc(i, sizeof(double));
-        loc->all_data = (char**)calloc(i, sizeof(char*));
+        loc->all_timepoints = (double*)calloc((size_t) i, sizeof(double));
+        loc->all_data = (char**)calloc((size_t) i, sizeof(char*));
 
         /* Send file pointer and the two array storage pointers */
         /* to "cm_read_source()". This will return after        */

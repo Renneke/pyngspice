@@ -21,7 +21,6 @@ File: b3soiddld.c          98/5/01
 #include "ngspice/devdefs.h"
 #include "ngspice/suffix.h"
 
-#include "ngspice/fteext.h" /* controlled_exit() */
 
 #define MAX_EXP 5.834617425e14
 #define MIN_EXP 1.713908431e-15
@@ -305,9 +304,9 @@ char nanmessage [12];
 double m;
 
 
- for (; model != NULL; model = model->B3SOIDDnextModel)
-{    for (here = model->B3SOIDDinstances; here != NULL; 
-          here = here->B3SOIDDnextInstance)
+ for (; model != NULL; model = B3SOIDDnextModel(model))
+{    for (here = B3SOIDDinstances(model); here != NULL; 
+          here = B3SOIDDnextInstance(here))
      {     
           Check = 0;
           ByPass = 0;
@@ -1096,8 +1095,8 @@ fprintf(stderr, "Bypass for %s...\n", here->B3SOIDDname);
                      else
                         dVbs0teff_dT = 0.0;
 
-			/* Calculate nfb */
-			T3 = 1 / (K1 * K1);
+                     /* Calculate nfb */
+                     T3 = 1 / (K1 * K1);
 			T4 = pParam->B3SOIDDkb3 * Cbox / model->B3SOIDDcox;
 			T8 = sqrt(phi - Vbs0mos);
 			T5 = sqrt(1 + 4 * T3 * (phi + K1 * T8 - Vbs0mos));

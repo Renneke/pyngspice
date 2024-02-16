@@ -23,10 +23,10 @@ Author: 1985 Thomas L. Quarles
 /* pass 2 - Scan through the lines.  ".model" cards have processed in
  *  pass1 and are ignored here.  */
 
-void INPpas2(CKTcircuit *ckt, card * data, INPtables * tab, TSKtask *task)
+void INPpas2(CKTcircuit *ckt, struct card *data, INPtables * tab, TSKtask *task)
 {
 
-    card *current;
+    struct card *current;
     char c;
     char *groundname = "0";
     char *gname;
@@ -88,8 +88,8 @@ void INPpas2(CKTcircuit *ckt, card * data, INPtables * tab, TSKtask *task)
 #endif
 
 	c = *(current->line);
-	if(islower(c))
-	    c = (char) toupper(c);
+	if(islower_c(c))
+	    c = toupper_c(c);
 
 	switch (c) {
 
@@ -253,7 +253,7 @@ void INPpas2(CKTcircuit *ckt, card * data, INPtables * tab, TSKtask *task)
 	    return;
 	    break;
 
-	case 0:
+	case '\0':
 	    break;
 
 	default:

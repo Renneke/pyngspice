@@ -3,11 +3,10 @@ FILE    EVTiter.c
 
 MEMBER OF process XSPICE
 
-Copyright 1991
+Public Domain
+
 Georgia Tech Research Corporation
 Atlanta, Georgia 30332
-All Rights Reserved
-
 PROJECT A-8503
 
 AUTHORS
@@ -46,6 +45,7 @@ NON-STANDARD FEATURES
 
 #include "ngspice/mif.h"
 #include "ngspice/evt.h"
+#include "ngspice/enh.h"
 #include "ngspice/evtudn.h"
 
 #include "ngspice/evtproto.h"
@@ -289,9 +289,8 @@ int EVTiter(
     }
     FREE(err_msg);
 
-    SPfrontEnd->IFerror (ERR_WARNING,
-        "Too many iteration passes in event-driven circuits",
-        NULL);
+    SPfrontEnd->IFerrorf (ERR_WARNING,
+        "Too many iteration passes in event-driven circuits");
     return(E_ITERLIM);
 
 }

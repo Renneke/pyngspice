@@ -15,7 +15,7 @@ PROJECT=ngspice
 
 ADMSDIR=src/spicelib/devices/adms
 XMLPATH=src/spicelib/devices/adms/admst
-ADMSXML=admsXml
+ADMSXML=${ADMSXML:-admsXml}
 ADMS=0
 
 # Exit variable
@@ -96,7 +96,7 @@ check_autoconf()
 
 check_adms()
 {
-    (admsXml --version)   < /dev/null > /dev/null 2>&1 || {
+    ($ADMSXML --version) < /dev/null > /dev/null 2>&1 || {
         echo
 	echo "You must have admsXml installed to compile adms models."
 	echo "See http://mot-adms.sourceforge.net"
@@ -105,9 +105,41 @@ check_adms()
     }
 }
 
+
+# check if verilog-a files exist in every adms device directory
+check_adms_va()
+{
+    echo
+    # get the devices directories from configure.ac
+    admsdirs=`awk '$1 ~ /#VLAMKF/ { print $2 }' < configure.ac`
+    admsdirs=`echo $admsdirs | sed "s/\/Makefile//g"`
+
+    for adms_dir in $admsdirs ; do
+        FOK=0
+        if [ -d "$adms_dir" ]; then
+                    ls $adms_dir/admsva/*.va  > /dev/null 2>&1
+                    exitcode=$?
+                    if [ $exitcode -ne 0 ]; then
+                       FOK=1
+                    fi
+        else
+           FOK=1
+        fi
+        if [ "$FOK" -eq 1 ]; then
+            echo "Error: No *.va file found in $adms_dir/admsva"
+            echo "Please download patch file ng-adms-va.tar.gz from"
+            echo "http://ngspice.sourceforge.net/experimental/ng-adms-va.tar.gz"
+            echo "and expand it into the ngspice directory"
+            echo
+            DIE=1
+        fi
+    done
+}
+
 case "$1" in
     "--adms" | "-a")
         check_adms
+        check_adms_va
         ADMS=1
         ;;
 
@@ -167,7 +199,7 @@ $znew
             case "$adms_dir" in
 
                 "admst")
-                    echo "Skipping scripts dir"
+#                    echo "Skipping admst dir"
                     ;;
 
                 *)
@@ -175,7 +207,7 @@ $znew
                     echo "-->"$ADMSDIR/$adms_dir
                     (
                         cd $ADMSDIR/$adms_dir
-                        $ADMSXML `ls admsva/*.va` -Iadmsva -xv \
+                        $ADMSXML `ls admsva/*.va` -Iadmsva -xv -x \
                             -e ../admst/ngspiceVersion.xml \
                             -e ../admst/ngspiceMakefile.am.xml
                     )
@@ -191,14 +223,14 @@ $LIBTOOLIZE --copy --force \
     || error_and_exit "$LIBTOOLIZE failed"
 
 echo "Running aclocal $ACLOCAL_FLAGS"
-aclocal $ACLOCAL_FLAGS \
+aclocal $ACLOCAL_FLAGS --force -I m4 \
     || error_and_exit "aclocal failed"
 
 # optional feature: autoheader
 (autoheader --version) < /dev/null > /dev/null 2>&1
 if [ $? -eq 0 ]; then
   echo "Running autoheader"
-  autoheader \
+  autoheader --force \
       || error_and_exit "autoheader failed"
 fi
 
@@ -214,12 +246,12 @@ fi
 
 echo "Running autoconf"
 if [ "$ADMS" -gt 0 ]; then
-    autoconf temp-adms.ac > configure \
+    autoconf --force temp-adms.ac > configure \
         || error_and_exit "autoconf failed, with adms"
     rm -f temp-adms.ac
     chmod +x configure
 else
-    autoconf \
+    autoconf --force \
         || error_and_exit "autoconf failed"
 fi
 

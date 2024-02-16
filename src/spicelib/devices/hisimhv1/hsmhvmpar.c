@@ -4,11 +4,11 @@
  Copyright (C) 2012 Hiroshima University & STARC
 
  MODEL NAME : HiSIM_HV 
- ( VERSION : 1  SUBVERSION : 2  REVISION : 3 )
+ ( VERSION : 1  SUBVERSION : 2  REVISION : 4 )
  Model Parameter VERSION : 1.23
  FILE : hsmhvmpar.c
 
- DATE : 2012.4.6
+ DATE : 2013.04.30
 
  released by
                 Hiroshima University &
@@ -2447,28 +2447,48 @@ int HSMHVmParam(
     break;
 
   case HSMHV_MOD_VGS_MAX:
-      mod->HSMHVvgsMax = value->rValue;
-      mod->HSMHVvgsMaxGiven = TRUE;
-      break;
+    mod->HSMHVvgsMax = value->rValue;
+    mod->HSMHVvgsMaxGiven = TRUE;
+    break;
   case HSMHV_MOD_VGD_MAX:
-      mod->HSMHVvgdMax = value->rValue;
-      mod->HSMHVvgdMaxGiven = TRUE;
-      break;
+    mod->HSMHVvgdMax = value->rValue;
+    mod->HSMHVvgdMaxGiven = TRUE;
+    break;
   case HSMHV_MOD_VGB_MAX:
-      mod->HSMHVvgbMax = value->rValue;
-      mod->HSMHVvgbMaxGiven = TRUE;
-      break;
+    mod->HSMHVvgbMax = value->rValue;
+    mod->HSMHVvgbMaxGiven = TRUE;
+    break;
   case HSMHV_MOD_VDS_MAX:
-      mod->HSMHVvdsMax = value->rValue;
-      mod->HSMHVvdsMaxGiven = TRUE;
-      break;
+    mod->HSMHVvdsMax = value->rValue;
+    mod->HSMHVvdsMaxGiven = TRUE;
+    break;
   case HSMHV_MOD_VBS_MAX:
-      mod->HSMHVvbsMax = value->rValue;
-      mod->HSMHVvbsMaxGiven = TRUE;
-      break;
+    mod->HSMHVvbsMax = value->rValue;
+    mod->HSMHVvbsMaxGiven = TRUE;
+    break;
   case HSMHV_MOD_VBD_MAX:
-      mod->HSMHVvbdMax = value->rValue;
-      mod->HSMHVvbdMaxGiven = TRUE;
+    mod->HSMHVvbdMax = value->rValue;
+    mod->HSMHVvbdMaxGiven = TRUE;
+    break;
+  case HSMHV_MOD_VGSR_MAX:
+      mod->HSMHVvgsrMax = value->rValue;
+      mod->HSMHVvgsrMaxGiven = TRUE;
+      break;
+  case HSMHV_MOD_VGDR_MAX:
+      mod->HSMHVvgdrMax = value->rValue;
+      mod->HSMHVvgdrMaxGiven = TRUE;
+      break;
+  case HSMHV_MOD_VGBR_MAX:
+      mod->HSMHVvgbrMax = value->rValue;
+      mod->HSMHVvgbrMaxGiven = TRUE;
+      break;
+  case HSMHV_MOD_VBSR_MAX:
+      mod->HSMHVvbsrMax = value->rValue;
+      mod->HSMHVvbsrMaxGiven = TRUE;
+      break;
+  case HSMHV_MOD_VBDR_MAX:
+      mod->HSMHVvbdrMax = value->rValue;
+      mod->HSMHVvbdrMaxGiven = TRUE;
       break;
 
   default:

@@ -11,8 +11,8 @@
 
 /* gtri - evt - wbk - 5/20/91 - add event-driven and enhancements data */
 #ifdef XSPICE
-#include "ngspice/evt.h"
-#include "ngspice/enh.h"
+#include "ngspice/evttypes.h"
+#include "ngspice/enhtypes.h"
 #endif
 /* gtri - evt - wbk - 5/20/91 - add event-driven and enhancements data */
 
@@ -53,10 +53,11 @@ struct CKTnode {
 };
 
 /* defines for node parameters */
-#define PARM_NS        1
-#define PARM_IC        2
-#define PARM_NODETYPE  3
-
+enum {
+    PARM_NS = 1,
+    PARM_IC,
+    PARM_NODETYPE,
+};
 
 struct CKTcircuit {
 
@@ -76,7 +77,7 @@ struct CKTcircuit {
 
 
     STATistics *CKTstat;        /* The STATistics structure */
-    double *(CKTstates[8]);     /* Used as memory of past steps ??? */
+    double *CKTstates[8];       /* Used as memory of past steps ??? */
 
     /* Some shortcut for CKTstates */
 #define CKTstate0 CKTstates[0]
@@ -87,11 +88,11 @@ struct CKTcircuit {
 #define CKTstate5 CKTstates[5]
 #define CKTstate6 CKTstates[6]
 #define CKTstate7 CKTstates[7]
-    double CKTtime;             /* ??? */
-    double CKTdelta;            /* ??? */
-    double CKTdeltaOld[7];      /* Memory for ??? */
-    double CKTtemp;             /* Actual temperature of CKT */
-    double CKTnomTemp;          /* Reference temperature 27 C ? */
+    double CKTtime;             /* Current transient simulation time */
+    double CKTdelta;            /* next time step in transient simulation */
+    double CKTdeltaOld[7];      /* Memory for the 7 most recent CKTdelta */
+    double CKTtemp;             /* Actual temperature of CKT, initialzed to 300.15 K in cktinit.c*/
+    double CKTnomTemp;          /* Reference temperature 300.15 K set in cktinit.c */
     double CKTvt;               /* Thernmal voltage at CKTtemp */
     double CKTag[7];            /* the gear variable coefficient matrix */
 #ifdef PREDICTOR
@@ -101,6 +102,8 @@ struct CKTcircuit {
     int CKTorder;               /* the integration method order */
     int CKTmaxOrder;            /* maximum integration method order */
     int CKTintegrateMethod;     /* the integration method to be used */
+    double CKTxmu;              /* for trapezoidal method */
+    int CKTindverbosity;        /* control check of inductive couplings */
 
 /* known integration methods */
 #define TRAPEZOIDAL 1
@@ -150,6 +153,7 @@ struct CKTcircuit {
 
     CKTnode *CKTnodes;          /* ??? */
     CKTnode *CKTlastNode;       /* ??? */
+    CKTnode *prev_CKTlastNode;  /* just before model setup */
 
     /* This define should be somewhere else ??? */
 #define NODENAME(ckt,nodenum) CKTnodName(ckt,nodenum)
@@ -164,6 +168,9 @@ struct CKTcircuit {
 #define MODE               0x3
 #define MODETRAN           0x1
 #define MODEAC             0x2
+
+/* for noise analysis */
+#define MODEACNOISE        0x8
 
 /* old 'modedc' parameters */
 #define MODEDC            0x70
@@ -206,27 +213,28 @@ struct CKTcircuit {
     double CKTlteReltol;
     double CKTlteAbstol;
 #endif /* NEWTRUNC */
-    double CKTgmin;             /* Parallel Conductance --- */
-    double CKTgshunt;
-    double CKTdelmin;           /* ??? */
-    double CKTtrtol;            /* ??? */
-    double CKTfinalTime;        /* ??? */
-    double CKTstep;             /* ??? */
-    double CKTmaxStep;          /* ??? */
-    double CKTinitTime;         /* ??? */
-    double CKTomega;            /* ??? */
-    double CKTsrcFact;          /* ??? */
-    double CKTdiagGmin;         /* ??? */
-    int CKTnumSrcSteps;         /* ??? */
-    int CKTnumGminSteps;        /* ??? */
-    double CKTgminFactor;
-    int CKTnoncon;              /* ??? */
-    double CKTdefaultMosM;
+    double CKTgmin;             /* .options GMIN */
+    double CKTgshunt;           /* .options RSHUNT */
+    double CKTdelmin;           /* minimum time step for tran analysis */
+    double CKTtrtol;            /* .options TRTOL */
+    double CKTfinalTime;        /* TSTOP */
+    double CKTstep;             /* TSTEP */
+    double CKTmaxStep;          /* TMAX */
+    double CKTinitTime;         /* TSTART */
+    double CKTomega;            /* actual angular frequency for ac analysis */
+    double CKTsrcFact;          /* source stepping scaling factor */
+    double CKTdiagGmin;         /* actual value during gmin stepping */
+    int CKTnumSrcSteps;         /* .options SRCSTEPS */
+    int CKTnumGminSteps;        /* .options GMINSTEPS */
+    double CKTgminFactor;       /* gmin stepping scaling factor */
+    int CKTnoncon;              /* used by devices (and few other places)
+                                   to announce non-convergence */
+    double CKTdefaultMosM;      /* Default MOS multiplier parameter m */
     double CKTdefaultMosL;      /* Default Channel Lenght of MOS devices */
     double CKTdefaultMosW;      /* Default Channel Width of MOS devics */
     double CKTdefaultMosAD;     /* Default Drain Area of MOS */
     double CKTdefaultMosAS;     /* Default Source Area of MOS */
-    unsigned int CKThadNodeset:1; /* ??? */
+    unsigned int CKThadNodeset:1; /* flag to show that nodes have been set up */
     unsigned int CKTfixLimit:1; /* flag to indicate that the limiting
                                    of MOSFETs should be done as in
                                    SPICE2 */
@@ -286,8 +294,12 @@ struct CKTcircuit {
                            a safe operating area (SOA) check is executed */
     int CKTsoaMaxWarns; /* specifies the maximum number of SOA warnings */
 
+    double CKTepsmin; /* minimum argument value for some log functions, e.g. diode saturation current*/
+
     NGHASHPTR DEVnameHash;
     NGHASHPTR MODnameHash;
+
+    GENinstance *noise_input;   /* identify the input vsrc/isrc during noise analysis */
 };
 
 
@@ -296,7 +308,7 @@ struct CKTcircuit {
 extern int ACan(CKTcircuit *, int);
 extern int ACaskQuest(CKTcircuit *, JOB *, int , IFvalue *);
 extern int ACsetParm(CKTcircuit *, JOB *, int , IFvalue *);
-extern int CKTacDump(CKTcircuit *, double , void *);
+extern int CKTacDump(CKTcircuit *, double , runDesc *);
 extern int CKTacLoad(CKTcircuit *);
 extern int CKTaccept(CKTcircuit *);
 extern int CKTacct(CKTcircuit *, JOB *, int , IFvalue *);
@@ -316,7 +328,7 @@ extern int CKTdltMod(CKTcircuit *, GENmodel *);
 extern int CKTdltNNum(CKTcircuit *, int);
 extern int CKTdltNod(CKTcircuit *, CKTnode *);
 extern int CKTdoJob(CKTcircuit *, int , TSKtask *);
-extern void CKTdump(CKTcircuit *, double, void *);
+extern void CKTdump(CKTcircuit *, double, runDesc *);
 extern int CKTsoaInit(void);
 extern int CKTsoaCheck(CKTcircuit *);
 #ifdef CIDER
@@ -416,6 +428,10 @@ extern int DCpss(CKTcircuit *, int);
 /* SP */
 #endif
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 extern int NaskQuest(CKTcircuit *, JOB *, int, IFvalue *);
 extern int NsetParm(CKTcircuit *, JOB *, int, IFvalue *);
 extern int NIacIter(CKTcircuit *);
@@ -433,12 +449,17 @@ extern int NIreinit(CKTcircuit *);
 extern int NIsenReinit(CKTcircuit *);
 extern int NIdIter (CKTcircuit *);
 extern void NInzIter(CKTcircuit *, int, int);
+#ifdef __cplusplus
+}
+#endif
 
 #ifdef PREDICTOR
 extern int NIpred(CKTcircuit *ckt);
 #endif
 
 extern IFfrontEnd *SPfrontEnd;
-extern bool expr_w_temper;
+
+struct circ;
+extern void inp_evaluate_temper(struct circ *ckt);
 
 #endif

@@ -30,11 +30,11 @@ ISRCaccept(CKTcircuit *ckt, GENmodel *inModel)
     int error;
 
     /*  loop through all the voltage source models */
-    for( ; model != NULL; model = model->ISRCnextModel ) {
+    for( ; model != NULL; model = ISRCnextModel(model)) {
 
         /* loop through all the instances of the model */
-        for (here = model->ISRCinstances; here != NULL ;
-                here=here->ISRCnextInstance) {
+        for (here = ISRCinstances(model); here != NULL ;
+                here=ISRCnextInstance(here)) {
 
             if(!(ckt->CKTmode & (MODETRAN | MODETRANOP))) {
                 /* not transient, so shouldn't be here */
@@ -53,13 +53,10 @@ ISRCaccept(CKTcircuit *ckt, GENmodel *inModel)
                         double tshift;
                         double time = 0.;
                         double basetime = 0;
-
-/* gtri - begin - wbk - add PHASE parameter */
-#ifdef XSPICE
                         double PHASE;
                         double phase;
                         double deltat;
-#endif
+
                         TD = here->ISRCfunctionOrder > 2
                             ? here->ISRCcoeffs[2] : 0.0;
                         TR = here->ISRCfunctionOrder > 3
@@ -74,15 +71,13 @@ ISRCaccept(CKTcircuit *ckt, GENmodel *inModel)
                         PER = here->ISRCfunctionOrder > 6
                             && here->ISRCcoeffs[6] != 0.0
                             ? here->ISRCcoeffs[6] : ckt->CKTfinalTime;
-#ifdef XSPICE
                         PHASE = here->ISRCfunctionOrder > 7
                             ? here->ISRCcoeffs[7] : 0.0;
-#endif
+
                         /* offset time by delay */
                         time = ckt->CKTtime - TD;
                         tshift = TD;
 
-#ifdef XSPICE
                      /* normalize phase to 0 - 360° */
                      /* normalize phase to cycles */
                         phase = PHASE / 360.0;
@@ -92,8 +87,6 @@ ISRCaccept(CKTcircuit *ckt, GENmodel *inModel)
                             deltat -= PER;
                         time += deltat;
                         tshift = TD - deltat;
-#endif
-/* gtri - end - wbk - add PHASE parameter */
 
                         if(time >= PER) {
                             /* repeating signal - figure out where we are */
@@ -201,7 +194,7 @@ ISRCaccept(CKTcircuit *ckt, GENmodel *inModel)
                         /* FIXME, dont' want this here, over to aof_get or somesuch */
                         if (ckt->CKTtime == 0.0) {
                             if (ft_ngdebug)
-                                printf("VSRC: free fft tables\n");
+                                printf("ISRC: free fft tables\n");
                             fftFree();
                         }
 #endif

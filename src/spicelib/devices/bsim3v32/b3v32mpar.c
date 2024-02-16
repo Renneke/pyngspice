@@ -135,7 +135,7 @@ BSIM3v32mParam(int param, IFvalue *value, GENmodel *inMod)
         case BSIM3v32_MOD_NGATE:
             mod->BSIM3v32ngate = value->rValue;
             mod->BSIM3v32ngateGiven = TRUE;
-            if (mod->BSIM3v32ngate > 1.0e23)
+            if (mod->BSIM3v32ngate > 1.000001e24)
                 mod->BSIM3v32ngate *= 1.0e-6;
             break;
         case BSIM3v32_MOD_GAMMA1:
@@ -476,6 +476,12 @@ BSIM3v32mParam(int param, IFvalue *value, GENmodel *inMod)
         case BSIM3v32_MOD_WMLT:
             mod->BSIM3v32wmlt = value->rValue;
             mod->BSIM3v32wmltGiven = TRUE;
+            break;
+
+            /* Length shrink */
+        case  BSIM3v32_MOD_LMLT:
+            mod->BSIM3v32lmlt = value->rValue;
+            mod->BSIM3v32lmltGiven = TRUE;
             break;
 
         /* Length dependence */
@@ -1733,6 +1739,26 @@ BSIM3v32mParam(int param, IFvalue *value, GENmodel *inMod)
         case BSIM3v32_MOD_VBD_MAX:
             mod->BSIM3v32vbdMax = value->rValue;
             mod->BSIM3v32vbdMaxGiven = TRUE;
+            break;
+        case BSIM3v32_MOD_VGSR_MAX:
+            mod->BSIM3v32vgsrMax = value->rValue;
+            mod->BSIM3v32vgsrMaxGiven = TRUE;
+            break;
+        case BSIM3v32_MOD_VGDR_MAX:
+            mod->BSIM3v32vgdrMax = value->rValue;
+            mod->BSIM3v32vgdrMaxGiven = TRUE;
+            break;
+        case BSIM3v32_MOD_VGBR_MAX:
+            mod->BSIM3v32vgbrMax = value->rValue;
+            mod->BSIM3v32vgbrMaxGiven = TRUE;
+            break;
+        case BSIM3v32_MOD_VBSR_MAX:
+            mod->BSIM3v32vbsrMax = value->rValue;
+            mod->BSIM3v32vbsrMaxGiven = TRUE;
+            break;
+        case BSIM3v32_MOD_VBDR_MAX:
+            mod->BSIM3v32vbdrMax = value->rValue;
+            mod->BSIM3v32vbdrMaxGiven = TRUE;
             break;
 
         case  BSIM3v32_MOD_NMOS  :

@@ -79,7 +79,7 @@ com_aspice(wordlist *wl)
     bool saveout = FALSE;
 
     deck = wl->wl_word;
-    if (!cp_getvar("spicepath", CP_STRING, spicepath)) {
+    if (!cp_getvar("spicepath", CP_STRING, spicepath, sizeof(spicepath))) {
         if (!Spice_Path || !*Spice_Path) {
             fprintf(cp_err,
                     "No spice-3 binary is available for the aspice command.\n");
@@ -123,7 +123,7 @@ com_aspice(wordlist *wl)
         }
         (void) dup2(fileno(stdout), fileno(stderr));
 
-        (void) execl(spicepath, spicepath, "-r", raw, (void*)0);
+        (void) execl(spicepath, spicepath, "-r", raw, NULL);
 
         /* Screwed up. */
         perror(spicepath);
@@ -131,7 +131,7 @@ com_aspice(wordlist *wl)
     }
 
     /* Add this one to the job list. */
-    p = alloc(struct proc);
+    p = TMALLOC(struct proc, 1);
     p->pr_pid = pid;
     p->pr_name = copy(s);
     p->pr_rawfile = copy(raw);
@@ -282,11 +282,11 @@ com_rspice(wordlist *wl)
     char *p;
 
     /* Figure out where the spicedaemon is and connect to it. */
-    if (!cp_getvar("rhost", CP_STRING, rhost))
+    if (!cp_getvar("rhost", CP_STRING, rhost, sizeof(rhost)))
         (void) strcpy(rhost, Spice_Host);
-    if (!cp_getvar("rprogram", CP_STRING, program))
+    if (!cp_getvar("rprogram", CP_STRING, program, sizeof(program)))
         *program = '\0';
-    if (!cp_getvar("remote_shell", CP_STRING, remote_shell))
+    if (!cp_getvar("remote_shell", CP_STRING, remote_shell, sizeof(remote_shell)))
         strcpy(remote_shell, "rsh");
 
     if (*rhost == '\0') {
@@ -328,7 +328,7 @@ com_rspice(wordlist *wl)
         dup2(from_serv[1], 1);  /* stdout */
         dup2(err_serv[1], 2);   /* stderr */
 
-        execlp(remote_shell, remote_shell, rhost, program, "-s", (void*)0);
+        execlp(remote_shell, remote_shell, rhost, program, "-s", NULL);
         /* system(com_buf); */
         perror(remote_shell);
         exit(-1);

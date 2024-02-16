@@ -1,14 +1,14 @@
 /***********************************************************************
 
  HiSIM (Hiroshima University STARC IGFET Model)
- Copyright (C) 2012 Hiroshima University & STARC
+ Copyright (C) 2014 Hiroshima University & STARC
 
  MODEL NAME : HiSIM
- ( VERSION : 2  SUBVERSION : 7  REVISION : 0 ) Beta
+ ( VERSION : 2  SUBVERSION : 8  REVISION : 0 )
  
  FILE : hsm2def.h
 
- Date : 2012.10.25
+ Date : 2014.6.5
 
  released by 
                 Hiroshima University &
@@ -50,6 +50,7 @@ typedef struct sHSM2modelMKSParam {
   double HSM2_cit ;
   double HSM2_ovslp ;
   double HSM2_dly3 ;
+  double HSM2_ndepm ;
 } HSM2modelMKSParam ;
 
 /* binning parameters */
@@ -136,16 +137,18 @@ typedef struct sHSM2hereMKSParam {
 
 /* information needed for each instance */
 typedef struct sHSM2instance {
-  struct sHSM2model *HSM2modPtr;           /* pointer to model */
-  struct sHSM2instance *HSM2nextInstance;  /* pointer to next instance of 
-                                              current model*/
-  IFuid HSM2name; /* pointer to character string naming this instance */
-  int HSM2states; /* index into state table for this device */
 
-  int HSM2dNode;      /* number of the drain node of the mosfet */
-  int HSM2gNode;      /* number of the gate node of the mosfet */
-  int HSM2sNode;      /* number of the source node of the mosfet */
-  int HSM2bNode;      /* number of the bulk node of the mosfet */
+  struct GENinstance gen;
+
+#define HSM2modPtr(inst) ((struct sHSM2model *)((inst)->gen.GENmodPtr))
+#define HSM2nextInstance(inst) ((struct sHSM2instance *)((inst)->gen.GENnextInstance))
+#define HSM2name gen.GENname
+#define HSM2states gen.GENstate
+
+  const int HSM2dNode;      /* number of the drain node of the mosfet */
+  const int HSM2gNode;      /* number of the gate node of the mosfet */
+  const int HSM2sNode;      /* number of the source node of the mosfet */
+  const int HSM2bNode;      /* number of the bulk node of the mosfet */
   int HSM2dNodePrime; /* number od the inner drain node */
   int HSM2gNodePrime; /* number of the inner gate node */
   int HSM2sNodePrime; /* number od the inner source node */
@@ -331,9 +334,18 @@ typedef struct sHSM2instance {
   double HSM2_Qb_dVgs  ;
   double HSM2_Qb_dVds  ;
   double HSM2_Qb_dVbs  ;
-  double HSM2_alpha;
 
   /* internal variables */
+  double HSM2_depleak ;
+  double HSM2_depvmax ;
+  double HSM2_depmphn0 ;
+  double HSM2_depmphn1 ;
+  double HSM2_depmue0 ;
+  double HSM2_depmue1 ;
+  double HSM2_depmueback0 ;
+  double HSM2_depmueback1 ;
+  double HSM2_depvdsef1 ;
+  double HSM2_depvdsef2 ;
   double HSM2_eg ;
   double HSM2_beta ;
   double HSM2_beta_inv ;
@@ -343,6 +355,8 @@ typedef struct sHSM2instance {
   double HSM2_egp12 ;
   double HSM2_egp32 ;
   double HSM2_lgate ;
+  double HSM2_wgate ;
+  double HSM2_lg ;
   double HSM2_wg ;
   double HSM2_mueph ;
   double HSM2_mphn0 ;
@@ -404,6 +418,7 @@ typedef struct sHSM2instance {
   int HSM2_flg_pgd ;
   double HSM2_ndep_o_esi ;
   double HSM2_ninv_o_esi ;
+  double HSM2_ninvd ;
   double HSM2_cqyb0 ;
   double HSM2_cnst0over ;
   double HSM2_costi00 ;
@@ -412,7 +427,7 @@ typedef struct sHSM2instance {
   double HSM2_costi0_p2 ;
   double HSM2_costi1 ;
   double HSM2_pb2over ; /* for Qover model */
-  double HSM2_ps0ldinib ;
+//double HSM2_ps0ldinib ;
   double HSM2_ptl0;
   double HSM2_pt40;
   double HSM2_gdl0;
@@ -422,6 +437,10 @@ typedef struct sHSM2instance {
   double HSM2_mueph1 ;
   double HSM2_nsubp ;
   double HSM2_nsubc ;
+  /* Depletion Mode MOSFET */
+  double HSM2_ndepm ;
+  double HSM2_Pb2n ;
+  double HSM2_Vbipn ;
 
   HSM2hereMKSParam hereMKS ; /* unit-converted parameters */
   HSM2binningParam pParam ; /* binning parameters */
@@ -535,6 +554,80 @@ typedef struct sHSM2instance {
   double *HSM2BdbPtr;  /* pointer to sparse matrix element at (bulk node,drain body node) */
   double *HSM2BbPtr;   /* pointer to sparse matrix element at (bulk node,bulk node) */
 
+#ifdef USE_OMP
+    /* per instance storage of results, to update matrix and rhs at a later stage */
+    double HSM2rhsdPrime;
+    double HSM2rhsgPrime;
+    double HSM2rhsbPrime;
+    double HSM2rhssPrime;
+    double HSM2rhsdb;
+    double HSM2rhssb;
+
+    double HSM2_1;
+    double HSM2_2;
+    double HSM2_3;
+    double HSM2_4;
+    double HSM2_5;
+    double HSM2_6;
+    double HSM2_7;
+    double HSM2_8;
+    double HSM2_9;
+    double HSM2_10;
+    double HSM2_11;
+    double HSM2_12;
+    double HSM2_13;
+    double HSM2_14;
+    double HSM2_15;
+    double HSM2_16;
+    double HSM2_17;
+    double HSM2_18;
+    double HSM2_19;
+    double HSM2_20;
+    double HSM2_21;
+    double HSM2_22;
+    double HSM2_23;
+    double HSM2_24;
+    double HSM2_25;
+    double HSM2_26;
+    double HSM2_27;
+    double HSM2_28;
+    double HSM2_29;
+    double HSM2_30;
+    double HSM2_31;
+    double HSM2_32;
+    double HSM2_33;
+    double HSM2_34;
+    double HSM2_35;
+    double HSM2_36;
+    double HSM2_37;
+    double HSM2_38;
+    double HSM2_39;
+    double HSM2_40;
+    double HSM2_41;
+    double HSM2_42;
+    double HSM2_43;
+    double HSM2_44;
+    double HSM2_45;
+    double HSM2_46;
+    double HSM2_47;
+    double HSM2_48;
+    double HSM2_49;
+    double HSM2_50;
+    double HSM2_51;
+    double HSM2_52;
+    double HSM2_53;
+    double HSM2_54;
+    double HSM2_55;
+    double HSM2_56;
+    double HSM2_57;
+    double HSM2_58;
+    double HSM2_59;
+    double HSM2_60;
+    double HSM2_61;
+    double HSM2_62;
+    double HSM2_63;
+#endif
+
   /* common state values in hisim module */
 #define HSM2vbd HSM2states+ 0
 #define HSM2vbs HSM2states+ 1
@@ -590,17 +683,19 @@ typedef struct sHSM2instance {
 /* per model data */
 
 typedef struct sHSM2model {       	/* model structure for a resistor */
-  int HSM2modType;    		/* type index of this device type */
-  struct sHSM2model *HSM2nextModel; /* pointer to next possible model 
-					 in linked list */
-  HSM2instance * HSM2instances;	/* pointer to list of instances 
-				   that have this model */
-  IFuid HSM2modName;       	/* pointer to the name of this model */
+
+  struct GENmodel gen;
+
+#define HSM2modType gen.GENmodType
+#define HSM2nextModel(inst) ((struct sHSM2model *)((inst)->gen.GENnextModel))
+#define HSM2instances(inst) ((HSM2instance *)((inst)->gen.GENinstances))
+#define HSM2modName gen.GENmodName
+
   int HSM2_type;      		/* device type: 1 = nmos,  -1 = pmos */
   int HSM2_level;               /* level */
   int HSM2_info;                /* information */
   int HSM2_noise;               /* noise model selecter see hsm2noi.c */
-  int HSM2_version;             /* model version 200 */
+  int HSM2_version;             /* model version 2.80 */
   int HSM2_show;                /* show physical value 1, 2, ... , 11 */
 
   /* flags for initial guess */
@@ -624,6 +719,8 @@ typedef struct sHSM2model {       	/* model structure for a resistor */
   int HSM2_coqy;
   int HSM2_coqovsm ;
   int HSM2_coerrrep;
+  int HSM2_codep;
+  int HSM2_coddlt; /* add in version 2.80 */
 
   /* HiSIM original */
   double HSM2_vmax ;
@@ -696,6 +793,8 @@ typedef struct sHSM2model {       	/* model structure for a resistor */
   double HSM2_ndepwp ;
   double HSM2_ninv ;
   double HSM2_ninvd ;
+  double HSM2_ninvdl ;
+  double HSM2_ninvdlp ;
   double HSM2_muecb0 ;
   double HSM2_muecb1 ;
   double HSM2_mueph1 ;
@@ -885,6 +984,40 @@ typedef struct sHSM2model {       	/* model structure for a resistor */
   double HSM2_muecb0lp;
   double HSM2_muecb1lp;
 
+  /* Depletion Mode MOSFET */
+  double HSM2_ndepm ;
+  double HSM2_ndepml ;
+  double HSM2_ndepmlp ;
+  double HSM2_tndep ;
+  double HSM2_depleak ;
+  double HSM2_depleakl ;
+  double HSM2_depleaklp ;
+  double HSM2_depmue0;
+  double HSM2_depmue0l;
+  double HSM2_depmue0lp;
+  double HSM2_depmue1;
+  double HSM2_depmue1l;
+  double HSM2_depmue1lp;
+  double HSM2_depmueback0;
+  double HSM2_depmueback0l;
+  double HSM2_depmueback0lp;
+  double HSM2_depmueback1;
+  double HSM2_depmueback1l;
+  double HSM2_depmueback1lp;
+  double HSM2_depmueph0;
+  double HSM2_depmueph1;
+  double HSM2_depvmax;
+  double HSM2_depvmaxl;
+  double HSM2_depvmaxlp;
+  double HSM2_depvdsef1;
+  double HSM2_depvdsef1l;
+  double HSM2_depvdsef1lp;
+  double HSM2_depvdsef2;
+  double HSM2_depvdsef2l;
+  double HSM2_depvdsef2lp;
+  double HSM2_depbb;
+  double HSM2_depmuetmp;
+  double HSM2_depeta ;
 
   /* binning parameters */
   double HSM2_lmin ;
@@ -1125,6 +1258,8 @@ typedef struct sHSM2model {       	/* model structure for a resistor */
   double HSM2_qme12 ;
   double HSM2_ktnom ;
   int HSM2_bypass_enable ;
+//int HSM2_subversion ;
+//int HSM2_revision ;
 
   double HSM2vgsMax;
   double HSM2vgdMax;
@@ -1132,8 +1267,19 @@ typedef struct sHSM2model {       	/* model structure for a resistor */
   double HSM2vdsMax;
   double HSM2vbsMax;
   double HSM2vbdMax;
+  double HSM2vgsrMax;
+  double HSM2vgdrMax;
+  double HSM2vgbrMax;
+  double HSM2vbsrMax;
+  double HSM2vbdrMax;
 
   HSM2modelMKSParam modelMKS ; /* unit-converted parameters */
+
+#ifdef USE_OMP
+    int HSM2InstCount;
+    struct sHSM2instance **HSM2InstanceArray;
+#endif
+
   /* flag for model */
   unsigned HSM2_type_Given  :1;
   unsigned HSM2_level_Given  :1;
@@ -1161,6 +1307,8 @@ typedef struct sHSM2model {       	/* model structure for a resistor */
   unsigned HSM2_coqy_Given  :1;
   unsigned HSM2_coqovsm_Given  :1;
   unsigned HSM2_coerrrep_Given :1;
+  unsigned HSM2_codep_Given  :1;
+  unsigned HSM2_coddlt_Given :1;
   unsigned HSM2_kappa_Given :1;  
   unsigned HSM2_vdiffj_Given :1; 
   unsigned HSM2_vmax_Given  :1;
@@ -1233,6 +1381,8 @@ typedef struct sHSM2model {       	/* model structure for a resistor */
   unsigned HSM2_ndepwp_Given  :1;
   unsigned HSM2_ninv_Given  :1;
   unsigned HSM2_ninvd_Given  :1;
+  unsigned HSM2_ninvdl_Given  :1;
+  unsigned HSM2_ninvdlp_Given  :1;
   unsigned HSM2_muecb0_Given  :1;
   unsigned HSM2_muecb1_Given  :1;
   unsigned HSM2_mueph1_Given  :1;
@@ -1420,6 +1570,41 @@ typedef struct sHSM2model {       	/* model structure for a resistor */
   unsigned HSM2_byptol_Given :1;
   unsigned HSM2_muecb0lp_Given :1;
   unsigned HSM2_muecb1lp_Given :1;
+
+  /* Depletion Mode MOSFET */
+  unsigned HSM2_ndepm_Given  :1;
+  unsigned HSM2_ndepml_Given  :1;
+  unsigned HSM2_ndepmlp_Given  :1;
+  unsigned HSM2_tndep_Given  :1;
+  unsigned HSM2_depleak_Given  :1;
+  unsigned HSM2_depleakl_Given  :1;
+  unsigned HSM2_depleaklp_Given  :1;
+  unsigned HSM2_depmue0_Given :1;
+  unsigned HSM2_depmue0l_Given :1;
+  unsigned HSM2_depmue0lp_Given :1;
+  unsigned HSM2_depmue1_Given :1;
+  unsigned HSM2_depmue1l_Given :1;
+  unsigned HSM2_depmue1lp_Given :1;
+  unsigned HSM2_depmueback0_Given :1;
+  unsigned HSM2_depmueback0l_Given :1;
+  unsigned HSM2_depmueback0lp_Given :1;
+  unsigned HSM2_depmueback1_Given :1;
+  unsigned HSM2_depmueback1l_Given :1;
+  unsigned HSM2_depmueback1lp_Given :1;
+  unsigned HSM2_depmueph0_Given :1;
+  unsigned HSM2_depmueph1_Given :1;
+  unsigned HSM2_depvmax_Given :1;
+  unsigned HSM2_depvmaxl_Given :1;
+  unsigned HSM2_depvmaxlp_Given :1;
+  unsigned HSM2_depvdsef1_Given :1;
+  unsigned HSM2_depvdsef1l_Given :1;
+  unsigned HSM2_depvdsef1lp_Given :1;
+  unsigned HSM2_depvdsef2_Given :1;
+  unsigned HSM2_depvdsef2l_Given :1;
+  unsigned HSM2_depvdsef2lp_Given :1;
+  unsigned HSM2_depbb_Given :1;
+  unsigned HSM2_depmuetmp_Given :1;
+  unsigned HSM2_depeta_Given  :1;
 
   /* binning parameters */
   unsigned HSM2_lmin_Given :1;
@@ -1660,6 +1845,11 @@ typedef struct sHSM2model {       	/* model structure for a resistor */
   unsigned  HSM2vdsMaxGiven  :1;
   unsigned  HSM2vbsMaxGiven  :1;
   unsigned  HSM2vbdMaxGiven  :1;
+  unsigned  HSM2vgsrMaxGiven  :1;
+  unsigned  HSM2vgdrMaxGiven  :1;
+  unsigned  HSM2vgbrMaxGiven  :1;
+  unsigned  HSM2vbsrMaxGiven  :1;
+  unsigned  HSM2vbdrMaxGiven  :1;
 
 } HSM2model;
 
@@ -1698,6 +1888,9 @@ typedef struct sHSM2model {       	/* model structure for a resistor */
 #define HSM2_MOD_COQY    38
 #define HSM2_MOD_COQOVSM 39
 #define HSM2_MOD_COERRREP     153
+#define HSM2_MOD_CODEP   45
+#define HSM2_MOD_CODDLT  40
+
 /* device parameters */
 #define HSM2_L           51
 #define HSM2_W           52
@@ -1799,6 +1992,8 @@ typedef struct sHSM2model {       	/* model structure for a resistor */
 #define HSM2_MOD_NDEPWP    470
 #define HSM2_MOD_NINV      130
 #define HSM2_MOD_NINVD     300
+#define HSM2_MOD_NINVDL    301
+#define HSM2_MOD_NINVDLP   302
 #define HSM2_MOD_MUECB0    131
 #define HSM2_MOD_MUECB1    132
 #define HSM2_MOD_MUEPH1    133
@@ -1982,15 +2177,50 @@ typedef struct sHSM2model {       	/* model structure for a resistor */
 /* val symbol for WPE */
 #define HSM2_MOD_WEB	    88
 #define HSM2_MOD_WEC	    89
-#define HSM2_MOD_NSUBCWPE  91
-#define HSM2_MOD_NPEXTWPE  41
-#define HSM2_MOD_NSUBPWPE  43
+#define HSM2_MOD_NSUBCWPE   91
+#define HSM2_MOD_NPEXTWPE   41
+#define HSM2_MOD_NSUBPWPE   43
 
 #define HSM2_MOD_VGSMIN    466
 #define HSM2_MOD_SC3VBS    467
 #define HSM2_MOD_BYPTOL    468
-#define HSM2_MOD_MUECB0LP   473
-#define HSM2_MOD_MUECB1LP   474
+#define HSM2_MOD_MUECB0LP  473
+#define HSM2_MOD_MUECB1LP  474
+
+#define HSM2_MOD_NDEPM     600
+#define HSM2_MOD_NDEPML    610
+#define HSM2_MOD_NDEPMLP   611
+#define HSM2_MOD_TNDEP     601
+#define HSM2_MOD_DEPLEAK   608
+#define HSM2_MOD_DEPLEAKL  614
+#define HSM2_MOD_DEPLEAKLP 615
+#define HSM2_MOD_DEPETA    609
+#define HSM2_MOD_DEPMUE0      275
+#define HSM2_MOD_DEPMUE0L     276
+#define HSM2_MOD_DEPMUE0LP    277
+#define HSM2_MOD_DEPMUE1      278
+#define HSM2_MOD_DEPMUE1L     279
+#define HSM2_MOD_DEPMUE1LP    280
+#define HSM2_MOD_DEPMUEBACK0  288
+#define HSM2_MOD_DEPMUEBACK0L  289
+#define HSM2_MOD_DEPMUEBACK0LP  291
+#define HSM2_MOD_DEPMUEBACK1  293
+#define HSM2_MOD_DEPMUEBACK1L  294
+#define HSM2_MOD_DEPMUEBACK1LP  295
+#define HSM2_MOD_DEPMUEPH0    296
+#define HSM2_MOD_DEPMUEPH1    297
+#define HSM2_MOD_DEPVMAX      298
+#define HSM2_MOD_DEPVMAXL     299
+#define HSM2_MOD_DEPVMAXLP    313
+#define HSM2_MOD_DEPVDSEF1    314
+#define HSM2_MOD_DEPVDSEF1L   315
+#define HSM2_MOD_DEPVDSEF1LP  316
+#define HSM2_MOD_DEPVDSEF2    317
+#define HSM2_MOD_DEPVDSEF2L   318
+#define HSM2_MOD_DEPVDSEF2LP  319
+#define HSM2_MOD_DEPBB        320
+#define HSM2_MOD_DEPMUETMP    321
+
 
 /* binning parameters */
 #define HSM2_MOD_LMIN       1000
@@ -2302,14 +2532,23 @@ typedef struct sHSM2model {       	/* model structure for a resistor */
 #define HSM2_MOD_VDS_MAX    4004
 #define HSM2_MOD_VBS_MAX    4005
 #define HSM2_MOD_VBD_MAX    4006
+#define HSM2_MOD_VGSR_MAX   4007
+#define HSM2_MOD_VGDR_MAX   4008
+#define HSM2_MOD_VGBR_MAX   4009
+#define HSM2_MOD_VBSR_MAX   4010
+#define HSM2_MOD_VBDR_MAX   4011
 
 #include "hsm2ext.h"
 
 /*
+#ifdef __STDC__
 extern void HSM2evaluate(double,double,double,HSM2instance*,HSM2model*,
         double*,double*,double*, double*, double*, double*, double*, 
         double*, double*, double*, double*, double*, double*, double*, 
         double*, double*, double*, double*, CKTcircuit*);
+#else
+extern void HSM2evaluate();
+#endif
 */
 
 #endif /*HSM2*/

@@ -11,9 +11,9 @@ Copyright 1992 Regents of the University of California.  All rights reserved.
 #include "ngspice/ftedefs.h"
 #include "ngspice/fteparse.h"
 #include "ngspice/dvec.h"
+#include "ngspice/stringskip.h"
 
 #include "newcoms.h"
-#include "quote.h"
 
 
 /*
@@ -54,7 +54,7 @@ com_reshape(wordlist *wl)
             if (p != w->wl_word)
                 w = w->wl_next;
             wlast = w;
-            *p++ = 0;
+            *p++ = '\0';
         } else {
             wlast = NULL;
         }
@@ -79,8 +79,7 @@ com_reshape(wordlist *wl)
                 wlast = wlast->wl_next;
             }
 
-            while (*p && isspace(*p))
-                p++;
+            p = skip_ws(p);
 
             switch (state) {
             case 0: /* p just at or before a number */
@@ -89,7 +88,7 @@ com_reshape(wordlist *wl)
                     if (numdims == MAXDIMS)
                         printf("Maximum of %d dimensions possible\n", MAXDIMS);
                     numdims += 1;
-                } else if (!isdigit(*p)) {
+                } else if (!isdigit_c(*p)) {
                     if (empty > -1) {
                         printf("dimensions underspecified at dimension %d\n",
                                numdims++);
@@ -100,7 +99,7 @@ com_reshape(wordlist *wl)
                     }
                 } else {
                     dims[numdims++] = atoi(p);
-                    while (isdigit(*p))
+                    while (isdigit_c(*p))
                         p++;
                 }
                 state = 1;
@@ -113,10 +112,10 @@ com_reshape(wordlist *wl)
                 } else if (*p == ',') {
                     p++;
                     state = 0;
-                } else if (isdigit(*p)) {
+                } else if (isdigit_c(*p)) {
                     state = 0;
                     break;
-                } else if (!isspace(*p)) {
+                } else if (!isspace_c(*p)) {
                     /* error */
                     state = 4;
                 }
@@ -131,8 +130,7 @@ com_reshape(wordlist *wl)
                 }
             }
 
-            while (*p && isspace(*p))
-                p++;
+            p = skip_ws(p);
 
         } while (state < 3);
 

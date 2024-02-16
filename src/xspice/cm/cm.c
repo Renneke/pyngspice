@@ -3,11 +3,10 @@ FILE    CM.c
 
 MEMBER OF process XSPICE
 
-Copyright 1991
+Public Domain
+
 Georgia Tech Research Corporation
 Atlanta, Georgia 30332
-All Rights Reserved
-
 PROJECT A-8503
 
 AUTHORS
@@ -36,6 +35,8 @@ INTERFACES
 
     cm_message_get_errmsg()
     cm_message_send()
+    cm_get_path()
+    cm_get_circuit()
 
 REFERENCED FILES
 
@@ -48,6 +49,7 @@ NON-STANDARD FEATURES
 =========================================================================== */
 #include "ngspice/ngspice.h"
 #include "ngspice/cm.h"
+#include "ngspice/enh.h"
 #include "ngspice/mif.h"
 #include "ngspice/cktdefs.h"
 //#include "util.h"
@@ -521,8 +523,6 @@ double cm_analog_ramp_factor(void)
  *
  * This is a modified version of the function NIintegrate()
  *
- * Modifications are Copyright 1991 Georgia Tech Research Institute
- *
  */
 
 static void cm_static_integrate(int    byte_index,
@@ -691,3 +691,34 @@ void cm_analog_auto_partial(void)
     g_mif_info.auto_partial.local = MIF_TRUE;
 }
 
+/*
+cm_get_path()
+
+Return the path of the first file given on the command line
+after the command line options or set by the 'source' command.
+Will be used in function fopen_with_path().
+*/
+
+char *cm_get_path(void)
+{
+    return Infile_Path;
+}
+
+
+/* cm_get_circuit(void)
+
+To build complex custom-built xspice-models, access to certain
+parameters (e.g. maximum step size) may be needed to get reasonable
+results of a simulation. In detail, this may be necessary when
+spice interacts with an external sensor-simulator and the results
+of that external simulator do not have a direct impact on the spice
+circuit. Then, modifying the maximum step size on the fly may help
+to improve the simulation results. Modifying such parameters has to
+be done carefully. The patch enhances the xspice interface with
+access to the (fundamental) ckt pointer.
+*/
+
+CKTcircuit *cm_get_circuit(void)
+{
+    return(g_mif_info.ckt);
+}
